@@ -61,7 +61,7 @@
 			async function searchBLEDom() {
 				try {
 					device = await navigator.bluetooth.requestDevice({
-						filters: [{ namePrefix: 'LED' }],
+						acceptAllDevices: true,
 						optionalServices: ['0000ffe5-0000-1000-8000-00805f9a34fb']
 					});
 					
