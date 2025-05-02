@@ -40,7 +40,7 @@
 let d = null;
 let c = null;
 let clr = {r:255,g:0,b:0};
-let pwr = 1;
+let pwr = 1; // Assume lights are on initially (UI only)
 let preview = 1;
 let cooldown = 0;
 let isConnected = false;
@@ -67,8 +67,10 @@ async function hc(){
         document.getElementById('connectBtn').style.display='none';
         document.getElementById('controls').style.display='block';
         isConnected = true;
-        // Initialize lights to on state
-        sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef])).then(()=>setC(clr.r,clr.g,clr.b));
+        
+        // Don't send any initial command - preserve current device state
+        // UI will show "Power Off" but actual device state is unknown
+        // First interaction will sync the state
     }catch(e){alert('Connection error:'+e);}
 }
 
@@ -98,8 +100,10 @@ function hoverPower(){
     const btn = document.getElementById('powerBtn');
     btn.classList.add('hover-effect');
     if(pwr) {
+        // Show dimmed state on hover when UI shows "On"
         sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef]));
     } else {
+        // Show lit state on hover when UI shows "Off"
         sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef]));
     }
 }
@@ -108,6 +112,7 @@ function unhoverPower(){
     if (!isConnected) return;
     const btn = document.getElementById('powerBtn');
     btn.classList.remove('hover-effect');
+    // Restore to current UI state (not device state)
     sc(new Uint8Array([0x7e,0,4,pwr?1:0,0,0,0,0xef]));
 }
 
@@ -117,7 +122,10 @@ function lockPower(){
     const p=document.getElementById('powerBtn');
     p.textContent=pwr?'Power Off':'Power On';
     p.classList.toggle('on');
-    sc(new Uint8Array([0x7e,0,4,pwr?1:0,0,0,0,0xef])).then(()=>pwr&&setC(clr.r,clr.g,clr.b));
+    // Send the new power state to device
+    sc(new Uint8Array([0x7e,0,4,pwr?1:0,0,0,0,0xef])).then(()=>{
+        if(pwr) setC(clr.r,clr.g,clr.b);
+    });
 }
 
 function togglePreview(){
