@@ -61,101 +61,116 @@
     </div>
 
     <script>
-        let device = null;
-        let characteristic = null;
-        let currentColor = { r: 255, g: 255, b: 255 };
+    let device = null;
+    let characteristic = null;
+    let currentColor = { r: 255, g: 255, b: 255 };
 
-        // Browser storage keys
-        const STORAGE_KEYS = {
-            DEVICE_ID: 'bledom_device_id',
-            DEVICE_NAME: 'bledom_device_name'
-        };
+    // Browser storage keys
+    const STORAGE_KEYS = {
+        DEVICE_ID: 'bledom_device_id',
+        DEVICE_NAME: 'bledom_device_name'
+    };
 
-        // Initialize
-        window.addEventListener('load', () => {
-            if (!navigator.bluetooth) {
-                document.getElementById('nosupport').style.display = 'block';
-                return;
-            }
-            document.getElementById('interface').style.display = 'block';
-            checkSavedDevice();
-        });
-
-        async function handleConnect() {
-            try {
-                const savedDeviceId = localStorage.getItem(STORAGE_KEYS.DEVICE_ID);
-                if (savedDeviceId) {
-                    await reconnectToDevice(savedDeviceId);
-                } else {
-                    await pairNewDevice();
-                }
-            } catch (error) {
-                console.error('Connection failed:', error);
-                updateStatus(`Error: ${error.message}`, true);
-            }
+    // Initialize
+    window.addEventListener('load', () => {
+        if (!navigator.bluetooth) {
+            document.getElementById('nosupport').style.display = 'block';
+            return;
         }
+        document.getElementById('interface').style.display = 'block';
+        checkSavedDevice();
+    });
 
-        async function reconnectToDevice(deviceId) {
-            updateStatus('Trying to reconnect...');
-            try {
-                device = await navigator.bluetooth.requestDevice({
-                    deviceId: deviceId,
-                });
-                await completeConnection();
-                updateStatus(`Reconnected to ${device.name || 'device'}`);
-            } catch (error) {
-                console.log('Reconnection failed, starting new pairing');
+    async function handleConnect() {
+        try {
+            const savedDeviceId = localStorage.getItem(STORAGE_KEYS.DEVICE_ID);
+            if (savedDeviceId) {
+                await reconnectToDevice(savedDeviceId);
+            } else {
                 await pairNewDevice();
             }
+        } catch (error) {
+            console.error('Connection failed:', error);
+            updateStatus(`Error: ${error.message}`, true);
         }
+    }
 
-        async function pairNewDevice() {
-            updateStatus('Select your device from the list...');
+    async function reconnectToDevice(deviceId) {
+        updateStatus('Reconnecting to saved device...');
+        try {
+            // First try to reconnect without showing device list
+            const allowedDevices = await navigator.bluetooth.getDevices();
+            const savedDevice = allowedDevices.find(d => d.id === deviceId);
+            
+            if (savedDevice && savedDevice.gatt) {
+                device = savedDevice;
+                await completeConnection();
+                updateStatus(`Connected to ${device.name || 'device'}`);
+                return;
+            }
+
+            // If silent reconnect fails, try with deviceId (may show list briefly)
             device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
+                deviceId: deviceId,
                 optionalServices: ['0000fff0-0000-1000-8000-00805f9b34fb']
             });
-            
-            // Store device identifier
-            localStorage.setItem(STORAGE_KEYS.DEVICE_ID, device.id);
-            localStorage.setItem(STORAGE_KEYS.DEVICE_NAME, device.name);
-            
             await completeConnection();
             updateStatus(`Connected to ${device.name || 'device'}`);
+        } catch (error) {
+            console.log('Reconnection failed:', error);
+            // If deviceId-based reconnect fails, clear saved device and start fresh
+            localStorage.removeItem(STORAGE_KEYS.DEVICE_ID);
+            localStorage.removeItem(STORAGE_KEYS.DEVICE_NAME);
+            await pairNewDevice();
         }
+    }
 
-        async function completeConnection() {
-            device.addEventListener('gattserverdisconnected', onDisconnected);
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
-            characteristic = await service.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
-            
-            document.getElementById('connectBtn').style.display = 'none';
-            document.getElementById('controls').style.display = 'block';
-            document.getElementById('powerBtn').classList.add('on');
+    async function pairNewDevice() {
+        updateStatus('Select your device from the list...');
+        device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: ['0000fff0-0000-1000-8000-00805f9b34fb']
+        });
+        
+        // Store device identifier
+        localStorage.setItem(STORAGE_KEYS.DEVICE_ID, device.id);
+        localStorage.setItem(STORAGE_KEYS.DEVICE_NAME, device.name || 'Unknown Device');
+        
+        await completeConnection();
+        updateStatus(`Connected to ${device.name || 'device'}`);
+    }
+
+    async function completeConnection() {
+        device.addEventListener('gattserverdisconnected', onDisconnected);
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
+        characteristic = await service.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
+        
+        document.getElementById('connectBtn').style.display = 'none';
+        document.getElementById('controls').style.display = 'block';
+        document.getElementById('powerBtn').classList.add('on');
+    }
+
+    function onDisconnected() {
+        updateStatus('Disconnected. Click Connect to reconnect.', true);
+        device = null;
+        characteristic = null;
+        document.getElementById('connectBtn').style.display = 'block';
+        document.getElementById('controls').style.display = 'none';
+    }
+
+    function checkSavedDevice() {
+        const deviceName = localStorage.getItem(STORAGE_KEYS.DEVICE_NAME);
+        if (deviceName) {
+            updateStatus(`Saved device: ${deviceName}`);
         }
+    }
 
-        function onDisconnected() {
-            updateStatus('Disconnected. Click Connect to reconnect.', true);
-            device = null;
-            characteristic = null;
-            document.getElementById('connectBtn').style.display = 'block';
-            document.getElementById('controls').style.display = 'none';
-        }
-
-        function checkSavedDevice() {
-            const deviceName = localStorage.getItem(STORAGE_KEYS.DEVICE_NAME);
-            if (deviceName) {
-                updateStatus(`Paired device: ${deviceName}`);
-            }
-        }
-
-        function updateStatus(message, isError = false) {
-            const statusEl = document.getElementById('status');
-            statusEl.textContent = message;
-            statusEl.style.color = isError ? '#ff4444' : 'inherit';
-        }
-
+    function updateStatus(message, isError = false) {
+        const statusEl = document.getElementById('status');
+        statusEl.textContent = message;
+        statusEl.style.color = isError ? '#ff4444' : 'inherit';
+    }
         // Device control functions
         function sendCommand(command) {
             if (!characteristic) return Promise.reject('Not connected');
