@@ -75,8 +75,13 @@ function lockColor(e){
     setTimeout(()=>cooldown=0,5000);
 }
 
-function hoverPower(){if(pwr)sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef]));}
-function unhoverPower(){if(pwr)sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef]));}
+function hoverPower(){
+    if(!pwr) sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef]));
+    else sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef]));
+}
+function unhoverPower(){
+    sc(new Uint8Array([0x7e,0,4,pwr?1:0,0,0,0,0xef]));
+}
 function lockPower(){
     pwr=!pwr;
     const p=document.getElementById('powerBtn');
