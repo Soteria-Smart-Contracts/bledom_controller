@@ -11,28 +11,14 @@
             text-align: center;
             margin: 20px;
         }
-        #color-container {
+        #color-triangle {
             width: 400px;
             height: 346px;
             margin: 20px auto;
             position: relative;
-        }
-        #color-triangle {
-            width: 100%;
-            height: 100%;
             clip-path: polygon(50% 0, 100% 100%, 0 100%);
             background: conic-gradient(red 0deg, #ff0 60deg, lime 120deg, cyan 180deg, blue 240deg, magenta 300deg, red 360deg);
             cursor: crosshair;
-        }
-        #magnifier {
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            border: 2px solid white;
-            border-radius: 50%;
-            pointer-events: none;
-            display: none;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
         }
         #brightness {
             width: 400px;
@@ -48,11 +34,25 @@
             margin: 5px;
             transition: 0.2s;
         }
-        #connectBtn { background: #3b82f6; color: white; }
-        #powerBtn { background: #444; color: white; }
-        #powerBtn.on { background: #3b82f6; box-shadow: 0 0 15px #3b82f6; }
-        #previewToggle { background: #555; color: white; }
-        #previewToggle.on { background: #3b82f6; }
+        #connectBtn {
+            background: #3b82f6;
+            color: white;
+        }
+        #powerBtn {
+            background: #444;
+            color: white;
+        }
+        #powerBtn.on {
+            background: #3b82f6;
+            box-shadow: 0 0 15px #3b82f6;
+        }
+        #previewToggle {
+            background: #555;
+            color: white;
+        }
+        #previewToggle.on {
+            background: #3b82f6;
+        }
     </style>
 </head>
 <body>
@@ -66,25 +66,36 @@
         <button id="connectBtn" onclick="handleConnect()">Connect</button>
         <div id="controls" style="display: none">
             <div>
-                <button id="powerBtn" onmouseover="handlePowerHover(true)" onmouseout="handlePowerHover(false)" onclick="togglePower()">Power Off</button>
+                <button id="powerBtn" 
+                        onmouseover="handlePowerHover(true)" 
+                        onmouseout="handlePowerHover(false)" 
+                        onclick="togglePower()">Power Off</button>
                 <button id="previewToggle" onclick="togglePreview()">Preview: ON</button>
             </div>
-            <div id="color-container">
-                <div id="color-triangle" onmousemove="handleColorHover(event)" onclick="selectColor(event)" onmouseout="hideMagnifier()"></div>
-                <div id="magnifier"></div>
-            </div>
-            <input type="range" id="brightness" min="0" max="100" value="100" oninput="handleBrightnessChange(event)">
+            <div id="color-triangle" 
+                 onmousemove="handleColorHover(event)" 
+                 onclick="selectColor(event)"></div>
+            <input type="range" id="brightness" min="0" max="100" value="100" 
+                   oninput="handleBrightnessChange(event)">
         </div>
     </div>
 
 <script>
-let device = null, characteristic = null, currentColor = { r: 255, g: 255, b: 255 };
-let isPoweredOn = true, isHoveringPower = false, previewEnabled = true, colorSelectCooldown = false;
+let device = null;
+let characteristic = null;
+let currentColor = { r: 255, g: 255, b: 255 };
+let isPoweredOn = true;
+let isHoveringPower = false;
+let previewEnabled = true;
+let colorSelectCooldown = false;
 
 // Initialize
 window.addEventListener('load', () => {
-    if (!navigator.bluetooth) document.getElementById('nosupport').style.display = 'block';
-    else document.getElementById('interface').style.display = 'block';
+    if (!navigator.bluetooth) {
+        document.getElementById('nosupport').style.display = 'block';
+        return;
+    }
+    document.getElementById('interface').style.display = 'block';
 });
 
 // Connection handling
@@ -111,61 +122,49 @@ async function handleConnect() {
     }
 }
 
-// Color handling with magnifier
+// Color calculations
+function calculateTriangleColor(x, y) {
+    const width = 400;
+    const height = 346;
+    
+    // Convert to barycentric coordinates
+    const v = (y / height) * 2;
+    const u = (x / width) * (1 - (y / height));
+    
+    const red = Math.min(255, (1 - u - v/2) * 255);
+    const green = Math.min(255, u * 255);
+    const blue = Math.min(255, (v/2) * 255);
+    
+    return {
+        r: Math.round(red),
+        g: Math.round(green),
+        b: Math.round(blue)
+    };
+}
+
 function handleColorHover(event) {
+    if (!previewEnabled || colorSelectCooldown) return;
+    
     const rect = event.target.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
+    const color = calculateTriangleColor(x, y);
     
-    // Show magnifier at cursor position
-    const mag = document.getElementById('magnifier');
-    mag.style.display = 'block';
-    mag.style.left = (event.clientX - 20) + 'px';
-    mag.style.top = (event.clientY - 20) + 'px';
-    
-    // Get exact pixel color
-    const ctx = document.createElement('canvas').getContext('2d');
-    ctx.canvas.width = rect.width;
-    ctx.canvas.height = rect.height;
-    const style = window.getComputedStyle(event.target);
-    ctx.fillStyle = style.background;
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    const pixel = ctx.getImageData(x, y, 1, 1).data;
-    
-    // Update magnifier with exact color
-    const rgb = { r: pixel[0], g: pixel[1], b: pixel[2] };
-    mag.style.background = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
-    
-    // Send color if preview is enabled and not in cooldown
-    if (previewEnabled && !colorSelectCooldown && isPoweredOn) {
-        sendColorCommand(rgb);
-    }
-}
-
-function hideMagnifier() {
-    document.getElementById('magnifier').style.display = 'none';
+    if (isPoweredOn) sendColorCommand(color);
 }
 
 function selectColor(event) {
     const rect = event.target.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
-    
-    // Get exact pixel color
-    const ctx = document.createElement('canvas').getContext('2d');
-    ctx.canvas.width = rect.width;
-    ctx.canvas.height = rect.height;
-    const style = window.getComputedStyle(event.target);
-    ctx.fillStyle = style.background;
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    const pixel = ctx.getImageData(x, y, 1, 1).data;
-    
-    currentColor = { r: pixel[0], g: pixel[1], b: pixel[2] };
+    currentColor = calculateTriangleColor(x, y);
     sendColorCommand(currentColor);
     
     // Start 5-second cooldown
     colorSelectCooldown = true;
-    setTimeout(() => colorSelectCooldown = false, 5000);
+    setTimeout(() => {
+        colorSelectCooldown = false;
+    }, 5000);
 }
 
 // Preview toggle
@@ -186,8 +185,8 @@ function sendColorCommand(color) {
 
 function handleBrightnessChange(event) {
     if (!characteristic || !isPoweredOn) return;
-    const command = new Uint8Array([0x7e, 0x00, 0x01, 
-                                  parseInt(event.target.value), 
+    const value = parseInt(event.target.value);
+    const command = new Uint8Array([0x7e, 0x00, 0x01, value, 
                                   0x00, 0x00, 0x00, 0x00, 0xef]);
     characteristic.writeValue(command);
 }
@@ -196,6 +195,7 @@ function handleBrightnessChange(event) {
 function handlePowerHover(hovering) {
     isHoveringPower = hovering;
     if (!characteristic) return;
+    
     const command = new Uint8Array([0x7e, 0x00, 0x04, 
                                    hovering ? 0x00 : (isPoweredOn ? 0x01 : 0x00), 
                                    0x00, 0x00, 0x00, 0xef]);
@@ -207,11 +207,14 @@ function togglePower() {
     const powerBtn = document.getElementById('powerBtn');
     powerBtn.textContent = isPoweredOn ? 'Power Off' : 'Power On';
     powerBtn.classList.toggle('on');
-    const command = new Uint8Array([0x7e, 0x00, 0x04, 
-                                  isPoweredOn ? 0x01 : 0x00, 
-                                  0x00, 0x00, 0x00, 0xef]);
-    characteristic.writeValue(command);
-    if (isPoweredOn) sendColorCommand(currentColor);
+    
+    if (isPoweredOn) {
+        sendColorCommand(currentColor);
+    } else {
+        const command = new Uint8Array([0x7e, 0x00, 0x04, 0x00, 
+                                      0x00, 0x00, 0x00, 0xef]);
+        characteristic.writeValue(command);
+    }
 }
 </script>
 </body>
