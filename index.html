@@ -75,13 +75,9 @@ function lockColor(e){
     setTimeout(()=>cooldown=0,5000);
 }
 
-// Initialize pwr to 1 (on) at the start
-let d=null,c=null,clr={r:255,g:0,b:0},pwr=1,preview=1,cooldown=0;
-
-// Update hover functions to work immediately
 function hoverPower(){
-    if(pwr) sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef]));
-    else sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef]));
+    if(!pwr) sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef]));
+    else sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef]));
 }
 function unhoverPower(){
     sc(new Uint8Array([0x7e,0,4,pwr?1:0,0,0,0,0xef]));
