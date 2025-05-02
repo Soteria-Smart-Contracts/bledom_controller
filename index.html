@@ -3,111 +3,99 @@
 	<head>
 		<meta charset="UTF-8" />
 		<title>BLEDOM Controller</title>
-		<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
 		<link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500" rel="stylesheet" />
-		<link rel="stylesheet" href="styles.css" />
-		<script src="useful.js"></script>
+		<style>
+			body {
+				font-family: 'Roboto', sans-serif;
+				text-align: center;
+				margin: 20px;
+			}
+			button {
+				padding: 10px 20px;
+				font-size: 16px;
+				background-color: #4CAF50;
+				color: white;
+				border: none;
+				border-radius: 4px;
+				cursor: pointer;
+			}
+			button:disabled {
+				background-color: #cccccc;
+			}
+			#powerBtn.off {
+				background-color: #f44336;
+			}
+		</style>
 	</head>
 	<body>
 		<div id="nosupport" style="display: none;">
 			<h1>Bluetooth is not enabled or supported by your web browser</h1>
-			<p>To enable the (experimental) Bluetooth capabilities of your web browser, go to <a href="chrome://flags" target="_blank">chrome://flags</a> and enable the <i>#experimental-web-platform-features</i> flag. Then restart your browser.</i></p>
-			<p>Also make sure to enable the new Web Permissions System, if not done already: <i>#enable-web-bluetooth-new-permissions-backend</i>.</p>
+			<p>To enable the (experimental) Bluetooth capabilities of your web browser, go to <a href="chrome://flags" target="_blank">chrome://flags</a> and enable the <i>#experimental-web-platform-features</i> flag. Then restart your browser.</p>
 		</div>
 		<div id="yesyes" style="display: none;">
 			<h1>BLEDOM Controller</h1>
 			<button id="searchBtn" onclick="searchBLEDom()">Connect</button>
 			<div id="controls" style="display: none;">
-				<h2>Default Controls</h2>
-				<button id="redBtn" onclick="setColor(255, 0, 0)">Red</button>
-				<button id="greenBtn" onclick="setColor(0, 255, 0)">Green</button>
-				<button id="blueBtn" onclick="setColor(0, 0, 255)">Blue</button>
-				<hr />
-				<input type="color" id="customColorInput" name="customColorInput" value="#FF0000" onchange="setColorHex(this.value)" />
-				<hr />
-				<select id="modeSelect" name="modeSelect" onchange="setModeEffect(this.value)">
-					<option value="null" selected disabled>Select an effect</option>
-					<option value="red">Red</option>
-					<option value="green">Green</option>
-					<option value="blue">Blue</option>
-					<option value="yellow">Yellow</option>
-					<option value="cyan">Cyan</option>
-					<option value="magenta">Magenta</option>
-					<option value="white">White</option>
-					<option value="jump_rgb">Jump RGB</option>
-					<option value="jump_rgbycmw">Jump RGBYCMW</option>
-					<option value="gradient_rgb">Fade RGB</option>
-					<option value="gradient_rgbycmw">Fade RGBYCMW</option>
-					<option value="gradient_r">Fade Red</option>
-					<option value="gradient_g">Fade Green</option>
-					<option value="gradient_b">Fade Blue</option>
-					<option value="gradient_y">Fade Yellow</option>
-					<option value="gradient_c">Fade Cyan</option>
-					<option value="gradient_m">Fade Magenta</option>
-					<option value="gradient_w">Fade White</option>
-					<option value="gradient_rg">Fade Red &amp; Green</option>
-					<option value="gradient_rb">Fade Red &amp; Blue</option>
-					<option value="gradient_gb">Fade Green &amp; Blue</option>
-					<option value="blink_rgbycmw">Blink RGBYCMW</option>
-					<option value="blink_r">Blink Red</option>
-					<option value="blink_g">Blink Green</option>
-					<option value="blink_b">Blink Blue</option>
-					<option value="blink_y">Blink Yellow</option>
-					<option value="blink_c">Blink Cyan</option>
-					<option value="blink_m">Blink Magenta</option>
-					<option value="blink_w">Blink White</option>
-				</select>
-				<hr />
-				<select id="dynamicSelect" name="dynamicSelect" onchange="setModeDynamic(parseInt(this.value))">
-					<option value="null" selected disabled>Select a dynamic effect</option>
-					<option value="0">Colorful Mode</option>
-					<option value="1">Beat On/Off Mode</option>
-					<option value="2">Beat Color Mode</option>
-					<option value="3">Fast Beat On/Off Mode</option>
-				</select>
-
-				<hr />
-				<h2>Capture System Audio</h2>
-				<button id="captureAudioBtn" onclick="startCapture(this);">Use system audio</button>
-				<br />
-				<input id="bbselect" title="Beat Bar Selection" type="range" min="0" max="12" value="0" step="1" onchange="drawer.beatBar = parseInt(this.value);">
-				<input id="lpfilter" title="Lowpass Filter" type="range" min="4" max="32" value="32" step="1" onchange="recorder.filter.frequency.value = parseInt(this.value);">
-				<input id="threshold" title="Threshold" type="range" min="0" max="128" value="100" step="1" onchange="drawer.threshold = parseInt(this.value);">
-				<input id="baramount" title="Amount of bars to take into account" type="range" min="1" max="32" value="8" step="1" onchange="drawer.bars = parseInt(this.value);">
-				<br />
-				<button id="filterresetbtn" onclick="resetFilters();">Reset filters</button>
-				<canvas id="visualizer"></canvas>
-				<hr />
-
-				<h2>Pre-defined Controls</h2>
-				<input type="checkbox" id="automaticcontrol" value="true" onchange="autoControl = this.checked; autoLooper();" /> <label for="automaticcontrol">Enabled</label><br />
-				<input type="number" min="1" max="200" step="1" id="bpm" value="138" placeholder="BPM" onkeydown="if(event.key==='.'){event.preventDefault();}" oninput="event.target.value = event.target.value.replace(/[^0-9]*/g,''); setBPM(parseInt(this.value));" /><br />
-				<select id="autotype" name="autotype" onchange="setAutoType(parseInt(this.value))">
-					<option value="null" selected disabled>Select automatic effect</option>
-					<option value="0">Test</option>
-				</select>
-				<hr />
-
-				<h2>Keyboard Control Options</h2>
-				<input type="checkbox" id="usekbd" value="true" onchange="useKbd = this.checked" /> <label for="usekbd">Enabled</label><br />
-				<input type="range" id="attack" value="0" step="0.01" min="0" max="10" title="Attack" />
-				<input type="range" id="release" value="0.25" step="0.01" min="0" max="4" title="Release" />
-				<input type="range" id="brightness" value="100" step="5" min="0" max="100" title="Brightness" onchange="setBrightness(parseInt(this.value))" onclick="setBrightness(parseInt(this.value))" />
-				<br />
-				<input type="checkbox" id="singleColorEnvelope" value="true" onchange="onlyOneKey = this.checked"/> <label for="singleColorEnvelope">Immediate color transition</label>
-				<br />
-				<button id="midiBtn" onclick="reqMidi();" style="display: none;">Use MIDI keyboard</button>
-				<input type="checkbox" id="useMidiRelease" value="true" onchange="useMidiRelease = this.checked"/> <label for="useMidiRelease">Use MIDI release</label>
+				<button id="powerBtn" class="off" onclick="togglePower()">Turn On</button>
 			</div>
 		</div>
 		<noscript>
 			<h1>Javascript is required for this webpage to work.</h1>
 			<p>Please enable Javascript in your browser, then reload the page.</p>
 		</noscript>
-		<script src="bt.js"></script>
-		<script src="midi.js"></script>
-		<script src="kbd.js"></script>
-		<script src="auto.js"></script>
-		<script src="input.js"></script>
+		<script>
+			let device = null;
+			let powerState = false;
+			
+			// Check for Bluetooth support
+			window.addEventListener('load', function() {
+				if (!navigator.bluetooth) {
+					document.getElementById('nosupport').style.display = 'block';
+					document.getElementById('yesyes').style.display = 'none';
+				} else {
+					document.getElementById('nosupport').style.display = 'none';
+					document.getElementById('yesyes').style.display = 'block';
+				}
+			});
+			
+			async function searchBLEDom() {
+				try {
+					device = await navigator.bluetooth.requestDevice({
+						filters: [{ namePrefix: 'LED' }],
+						optionalServices: ['0000ffe5-0000-1000-8000-00805f9a34fb']
+					});
+					
+					const server = await device.gatt.connect();
+					document.getElementById('searchBtn').disabled = true;
+					document.getElementById('controls').style.display = 'block';
+				} catch(error) {
+					console.error('Error:', error);
+					alert('Connection failed: ' + error.message);
+				}
+			}
+			
+			async function togglePower() {
+				if (!device) return;
+				
+				try {
+					const server = await device.gatt.connect();
+					const service = await server.getPrimaryService('0000ffe5-0000-1000-8000-00805f9a34fb');
+					const characteristic = await service.getCharacteristic('0000ffe9-0000-1000-8000-00805f9a34fb');
+					
+					powerState = !powerState;
+					const command = powerState ? new Uint8Array([0x7E, 0x00, 0x04, 0x01, 0x00, 0x00, 0x00, 0xEF]) 
+											  : new Uint8Array([0x7E, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0xEF]);
+					
+					await characteristic.writeValue(command);
+					
+					const powerBtn = document.getElementById('powerBtn');
+					powerBtn.textContent = powerState ? 'Turn Off' : 'Turn On';
+					powerBtn.className = powerState ? '' : 'off';
+				} catch(error) {
+					console.error('Error:', error);
+					alert('Operation failed: ' + error.message);
+				}
+			}
+		</script>
 	</body>
 </html>
