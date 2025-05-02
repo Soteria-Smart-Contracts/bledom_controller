@@ -21,6 +21,7 @@
         <button id="connectBtn" onclick="hc()">Connect</button>
         <div id="controls" style="display:none">
             <button id="powerBtn" onmouseover="hoverPower()" onmouseout="unhoverPower()" onclick="lockPower()">Power Off</button>
+            <br>
             <input type="range" id="brightness" min="0" max="100" value="100" oninput="setB(this.value)">
             <div id="color-rect" onmousemove="previewColor(event)" onclick="lockColor(event)"></div>
             <button id="previewBtn" class="on" onclick="togglePreview()">Preview: ON</button>
