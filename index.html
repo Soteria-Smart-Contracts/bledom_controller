@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF-8">
     <title>BLEDOM Controller</title>
     <style>
         :root {
@@ -22,7 +22,6 @@
             background: linear-gradient(to right, red, yellow, lime, cyan, blue, magenta, red);
             border-radius: 10px;
             margin: 20px auto;
-            position: relative;
             cursor: crosshair;
         }
         #brightness {
@@ -38,28 +37,10 @@
             cursor: pointer;
             transition: 0.3s;
         }
-        #connectBtn {
-            background: var(--accent);
-            color: white;
-        }
-        #powerBtn {
-            background: #444;
-            color: white;
-        }
-        #powerBtn.on {
-            background: var(--accent);
-            box-shadow: 0 0 15px var(--accent);
-        }
-        #forgetDeviceBtn {
-            background: #f44336;
-            color: white;
-            margin-top: 10px;
-            display: none;
-        }
-        #status {
-            margin: 10px 0;
-            min-height: 20px;
-        }
+        #connectBtn { background: var(--accent); color: white; }
+        #powerBtn { background: #444; color: white; }
+        #powerBtn.on { background: var(--accent); box-shadow: 0 0 15px var(--accent); }
+        #status { margin: 15px 0; min-height: 20px; }
     </style>
 </head>
 <body>
@@ -70,10 +51,8 @@
 
     <div id="interface" style="display: none;">
         <h1>BLEDOM Controller</h1>
-        <div id="status"></div>
-        <button id="connectBtn" onclick="handleConnectClick()">Connect</button>
-        <button id="forgetDeviceBtn" onclick="forgetDevice()">Forget Device</button>
-        
+        <div id="status">Click Connect to pair device</div>
+        <button id="connectBtn" onclick="handleConnect()">Connect</button>
         <div id="controls" style="display: none;">
             <div id="color-picker"></div>
             <input type="range" id="brightness" min="0" max="100" value="100">
@@ -82,126 +61,72 @@
     </div>
 
     <script>
-        // Bluetooth variables
         let device = null;
         let characteristic = null;
-        let commandInProgress = false;
         let currentColor = { r: 255, g: 255, b: 255 };
-        let isAttemptingReconnect = false;
 
-        // Check for cached device on load
+        // Browser storage keys
+        const STORAGE_KEYS = {
+            DEVICE_ID: 'bledom_device_id',
+            DEVICE_NAME: 'bledom_device_name'
+        };
+
+        // Initialize
         window.addEventListener('load', () => {
-            if (navigator.bluetooth) {
-                document.getElementById('interface').style.display = 'block';
-                updateUIForSavedDevice();
-            } else {
+            if (!navigator.bluetooth) {
                 document.getElementById('nosupport').style.display = 'block';
+                return;
             }
+            document.getElementById('interface').style.display = 'block';
+            checkSavedDevice();
         });
 
-        function updateUIForSavedDevice() {
-            const savedDevice = getSavedDevice();
-            if (savedDevice) {
-                document.getElementById('forgetDeviceBtn').style.display = 'inline-block';
-                document.getElementById('status').textContent = `Saved device: ${savedDevice.name}`;
-            }
-        }
-
-        async function handleConnectClick() {
-            const savedDevice = getSavedDevice();
-            if (savedDevice && !isAttemptingReconnect) {
-                isAttemptingReconnect = true;
-                document.getElementById('status').textContent = `Reconnecting to ${savedDevice.name}...`;
-                
-                try {
-                    await connectToDevice(savedDevice.id);
-                    document.getElementById('status').textContent = `Connected to ${savedDevice.name}`;
-                    isAttemptingReconnect = false;
-                    return;
-                } catch (error) {
-                    console.log('Reconnection failed:', error);
-                    document.getElementById('status').textContent = `Could not reconnect to ${savedDevice.name}`;
-                    isAttemptingReconnect = false;
-                    // Continue to show device list
+        async function handleConnect() {
+            try {
+                const savedDeviceId = localStorage.getItem(STORAGE_KEYS.DEVICE_ID);
+                if (savedDeviceId) {
+                    await reconnectToDevice(savedDeviceId);
+                } else {
+                    await pairNewDevice();
                 }
+            } catch (error) {
+                console.error('Connection failed:', error);
+                updateStatus(`Error: ${error.message}`, true);
             }
-            
-            // If no saved device or reconnection failed, show device list
-            showDeviceList();
         }
 
-        async function showDeviceList() {
+        async function reconnectToDevice(deviceId) {
+            updateStatus('Trying to reconnect...');
             try {
                 device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
+                    deviceId: deviceId,
                     optionalServices: ['0000fff0-0000-1000-8000-00805f9b34fb']
                 });
-
-                // Save device info
-                saveDevice({
-                    id: device.id,
-                    name: device.name || 'Unknown Device'
-                });
-                
-                await completeConnection(device);
-                document.getElementById('status').textContent = `Connected to ${device.name || 'device'}`;
-            } catch(error) {
-                console.error('Connection failed:', error);
-                document.getElementById('status').textContent = 'Connection cancelled';
+                await completeConnection();
+                updateStatus(`Reconnected to ${device.name || 'device'}`);
+            } catch (error) {
+                console.log('Reconnection failed, starting new pairing');
+                await pairNewDevice();
             }
         }
 
-        async function connectToDevice(deviceId) {
-            try {
-                // This will try to reconnect to the specific device
-                device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: ['0000fff0-0000-1000-8000-00805f9b34fb'],
-                    deviceId: deviceId
-                });
-                
-                await completeConnection(device);
-            } catch(error) {
-                console.error('Connection to saved device failed:', error);
-                throw error;
-            }
-        }
-
-        function forgetDevice() {
-            localStorage.removeItem('bledomDevice');
-            document.getElementById('forgetDeviceBtn').style.display = 'none';
-            document.getElementById('status').textContent = 'Device forgotten';
-            if (device) {
-                device.gatt.disconnect();
-            }
-            device = null;
-            characteristic = null;
-            document.getElementById('connectBtn').style.display = 'block';
-            document.getElementById('controls').style.display = 'none';
-        }
-
-        function getSavedDevice() {
-            const saved = localStorage.getItem('bledomDevice');
-            return saved ? JSON.parse(saved) : null;
-        }
-
-        function saveDevice(deviceInfo) {
-            localStorage.setItem('bledomDevice', JSON.stringify(deviceInfo));
-            document.getElementById('forgetDeviceBtn').style.display = 'inline-block';
-        }
-
-        function onDisconnected(event) {
-            console.log('Device disconnected');
-            device = null;
-            characteristic = null;
-            document.getElementById('connectBtn').style.display = 'block';
-            document.getElementById('controls').style.display = 'none';
-            document.getElementById('status').textContent = 'Disconnected';
-        }
-
-        async function completeConnection(device) {
-            device.addEventListener('gattserverdisconnected', onDisconnected);
+        async function pairNewDevice() {
+            updateStatus('Select your device from the list...');
+            device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ['0000fff0-0000-1000-8000-00805f9b34fb']
+            });
             
+            // Store device identifier
+            localStorage.setItem(STORAGE_KEYS.DEVICE_ID, device.id);
+            localStorage.setItem(STORAGE_KEYS.DEVICE_NAME, device.name);
+            
+            await completeConnection();
+            updateStatus(`Connected to ${device.name || 'device'}`);
+        }
+
+        async function completeConnection() {
+            device.addEventListener('gattserverdisconnected', onDisconnected);
             const server = await device.gatt.connect();
             const service = await server.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
             characteristic = await service.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
@@ -211,32 +136,40 @@
             document.getElementById('powerBtn').classList.add('on');
         }
 
-        // [Rest of your existing functions remain the same]
-        // sendCommand, setColor, setBrightness, togglePower, etc.
-        function sendCommand(command) {
-            if (!commandInProgress && characteristic) {
-                commandInProgress = true;
-                return characteristic.writeValue(command)
-                    .then(() => {
-                        commandInProgress = false;
-                    })
-                    .catch(err => {
-                        commandInProgress = false;
-                        console.error('Command failed:', err);
-                    });
+        function onDisconnected() {
+            updateStatus('Disconnected. Click Connect to reconnect.', true);
+            device = null;
+            characteristic = null;
+            document.getElementById('connectBtn').style.display = 'block';
+            document.getElementById('controls').style.display = 'none';
+        }
+
+        function checkSavedDevice() {
+            const deviceName = localStorage.getItem(STORAGE_KEYS.DEVICE_NAME);
+            if (deviceName) {
+                updateStatus(`Paired device: ${deviceName}`);
             }
-            return Promise.resolve();
+        }
+
+        function updateStatus(message, isError = false) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.style.color = isError ? '#ff4444' : 'inherit';
+        }
+
+        // Device control functions
+        function sendCommand(command) {
+            if (!characteristic) return Promise.reject('Not connected');
+            return characteristic.writeValue(command);
         }
 
         function setColor(r, g, b) {
-            if (!characteristic) return;
             currentColor = { r, g, b };
             const command = new Uint8Array([0x7e, 0x00, 0x05, 0x03, r, g, b, 0x00, 0xef]);
             return sendCommand(command);
         }
 
         function setBrightness(value) {
-            if (!characteristic) return;
             const command = new Uint8Array([0x7e, 0x00, 0x01, value, 0x00, 0x00, 0x00, 0x00, 0xef]);
             return sendCommand(command);
         }
@@ -244,27 +177,17 @@
         function togglePower() {
             const powerBtn = document.getElementById('powerBtn');
             const isOn = powerBtn.classList.contains('on');
+            const command = new Uint8Array([0x7e, 0x00, 0x04, isOn ? 0x00 : 0x01, 0x00, 0x00, 0x00, 0xef]);
             
-            if (isOn) {
-                const command = new Uint8Array([0x7e, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0xef]);
-                sendCommand(command).then(() => {
-                    powerBtn.textContent = 'Power On';
-                    powerBtn.classList.remove('on');
-                });
-            } else {
-                const command = new Uint8Array([0x7e, 0x00, 0x04, 0x01, 0x00, 0x00, 0x00, 0xef]);
-                sendCommand(command).then(() => {
-                    powerBtn.textContent = 'Power Off';
-                    powerBtn.classList.add('on');
-                    setColor(currentColor.r, currentColor.g, currentColor.b);
-                });
-            }
+            sendCommand(command).then(() => {
+                powerBtn.textContent = isOn ? 'Power On' : 'Power Off';
+                powerBtn.classList.toggle('on');
+                if (!isOn) setColor(currentColor.r, currentColor.g, currentColor.b);
+            });
         }
 
+        // Color picker implementation
         document.getElementById('color-picker').addEventListener('click', (e) => {
-            const powerBtn = document.getElementById('powerBtn');
-            if (!powerBtn.classList.contains('on')) return;
-            
             const rect = e.target.getBoundingClientRect();
             const x = (e.clientX - rect.left) / rect.width;
             const y = (e.clientY - rect.top) / rect.height;
@@ -281,14 +204,9 @@
         });
 
         function hsvToRgb(h, s, v) {
-            let r, g, b;
-            const i = Math.floor(h / 60);
-            const f = h / 60 - i;
-            const p = v * (1 - s);
-            const q = v * (1 - f * s);
-            const t = v * (1 - (1 - f) * s);
-            
-            switch(i % 6) {
+            let r, g, b, i = Math.floor(h/60), f = h/60 - i;
+            let p = v*(1-s), q = v*(1-f*s), t = v*(1-(1-f)*s);
+            switch(i%6) {
                 case 0: r=v, g=t, b=p; break;
                 case 1: r=q, g=v, b=p; break;
                 case 2: r=p, g=v, b=t; break;
@@ -296,32 +214,11 @@
                 case 4: r=t, g=p, b=v; break;
                 case 5: r=v, g=p, b=q; break;
             }
-            
             return {
-                r: Math.round(r * 255),
-                g: Math.round(g * 255),
-                b: Math.round(b * 255)
+                r: Math.round(r*255),
+                g: Math.round(g*255),
+                b: Math.round(b*255)
             };
-        }
-
-        function limitHex(value) {
-            return Math.min(255, Math.max(0, parseInt(value)));
-        }
-
-        function rgbToHex(r, g, b) {
-            return '#' + [r, g, b].map(x => {
-                const hex = x.toString(16);
-                return hex.length === 1 ? '0' + hex : hex;
-            }).join('');
-        }
-
-        function hexToRgb(hex) {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return result ? {
-                r: parseInt(result[1], 16),
-                g: parseInt(result[2], 16),
-                b: parseInt(result[3], 16)
-            } : { r: 0, g: 0, b: 0 };
         }
     </script>
 </body>
