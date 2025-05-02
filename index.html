@@ -5,8 +5,9 @@
     <title>BLEDOM Controller</title>
     <style>
         body{background:#0a192f;color:#e6f1ff;font-family:sans-serif;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;margin:0;}
-        #color-rect{width:600px;height:150px;background:linear-gradient(to right,red,yellow,lime,cyan,blue,magenta,red);cursor:crosshair;margin:20px 0;}
-        #brightness{width:600px;margin:20px 0;}
+        #color-rect{width:600px;height:300px;background:linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,1)), linear-gradient(to right,red,yellow,lime,cyan,blue,magenta,red);cursor:crosshair;margin:20px 0;position:relative;}
+        .preset{width:180px;height:40px;margin:5px;cursor:pointer;border:2px solid #444;border-radius:6px;}
+        .preset.editing{border:2px solid orange;}
         button{padding:12px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:5px;transition:all 0.3s;}
         #connectBtn{background:#3b82f6;color:white;}
         #powerBtn,#previewBtn{min-width:120px;}
@@ -14,6 +15,7 @@
         #powerBtn.on,#previewBtn.on{background:#3b82f6;box-shadow:0 0 15px #3b82f6;}
         #powerBtn:hover{transform:scale(1.05);box-shadow:0 0 10px rgba(59,130,246,0.5);}
         #powerBtn.hover-effect{background:#3b82f6;box-shadow:0 0 15px #3b82f6;}
+        #presets{display:flex;justify-content:center;margin-bottom:20px;}
     </style>
 </head>
 <body>
@@ -23,20 +25,32 @@
         <button id="connectBtn" onclick="hc()">Connect</button>
         <div id="controls" style="display:none">
             <button id="powerBtn" onmouseover="hoverPower()" onmouseout="unhoverPower()" onclick="lockPower()">Power Off</button><br>
-            <input type="range" id="brightness" min="0" max="100" value="50" oninput="setB(this.value)">
             <div id="color-rect" onmousemove="throttlePreview(event)" onclick="lockColor(event)"></div>
+            <div id="presets">
+                <div class="preset" id="preset1" onclick="handlePresetClick(1)" ondblclick="editPreset(1)"></div>
+                <div class="preset" id="preset2" onclick="handlePresetClick(2)" ondblclick="editPreset(2)"></div>
+                <div class="preset" id="preset3" onclick="handlePresetClick(3)" ondblclick="editPreset(3)"></div>
+            </div>
             <button id="previewBtn" class="on" onclick="togglePreview()">Preview: ON</button>
         </div>
     </div>
 
 <script>
 let d,c,clr={r:255,g:0,b:0},pwr=1,preview=1,cooldown=0,isConnected=0,lastColorTime=0;
+let presets = [
+    {r:255,g:60,b:0,brightness:50},
+    {r:0,g:255,b:255,brightness:50},
+    {r:255,g:0,b:255,brightness:50}
+];
+let editingPreset = null;
+
 const sc=cmd=>c?.writeValue(cmd)??Promise.reject();
 const setC=(r,g,b)=>{clr={r,g,b};return sc(new Uint8Array([0x7e,0,5,3,r,g,b,0,0xef]));};
 const setB=v=>sc(new Uint8Array([0x7e,0,1,v,0,0,0,0,0xef]));
 
 window.onload=()=>{
     document.getElementById(navigator.bluetooth?'interface':'nosupport').style.display='block';
+    updatePresetDisplays();
 };
 
 async function hc(){
@@ -56,14 +70,7 @@ async function hc(){
         document.getElementById('connectBtn').style.display='none';
         document.getElementById('controls').style.display='block';
         isConnected=1;
-        clr={r:255,g:60,b:0};
-        pwr=1;
-        await sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef]));
-        await sc(new Uint8Array([0x7e,0,1,18,0,0,0,0,0xef]));
-        await sc(new Uint8Array([0x7e,0,5,3,255,60,0,0,0xef]));
-        document.getElementById('powerBtn').textContent='Power Off';
-        document.getElementById('powerBtn').classList.add('on');
-        document.getElementById('brightness').value=18;
+        applyPreset(0); // Apply first preset on connect
     }catch(e){console.error('Connection error:',e);alert('Connection error: '+e.message);}
 }
 
@@ -71,17 +78,62 @@ function throttlePreview(e){
     const now=Date.now();
     if(!preview||cooldown||!pwr||now-lastColorTime<5)return;
     lastColorTime=now;
-    const rect=e.target.getBoundingClientRect(),x=(e.clientX-rect.left)/rect.width;
+    const rect=e.target.getBoundingClientRect();
+    const x=(e.clientX-rect.left)/rect.width;
+    const y=(e.clientY-rect.top)/rect.height;
+    const brightness = Math.round(100 - (y * 100));
     const rgb=hsvToRgb(x*360,1,1);
     setC(rgb.r,rgb.g,rgb.b);
+    setB(brightness);
 }
 
 function lockColor(e){
-    const rect=e.target.getBoundingClientRect(),x=(e.clientX-rect.left)/rect.width;
+    const rect=e.target.getBoundingClientRect();
+    const x=(e.clientX-rect.left)/rect.width;
+    const y=(e.clientY-rect.top)/rect.height;
+    const brightness = Math.round(100 - (y * 100));
     const rgb=hsvToRgb(x*360,1,1);
     setC(rgb.r,rgb.g,rgb.b);
+    setB(brightness);
+    if(editingPreset) {
+        presets[editingPreset-1] = {r:rgb.r, g:rgb.g, b:rgb.b, brightness};
+        updatePresetDisplays();
+        document.getElementById(`preset${editingPreset}`).classList.remove('editing');
+        editingPreset = null;
+    }
     cooldown=1;
     setTimeout(()=>cooldown=0,5000);
+}
+
+function handlePresetClick(num) {
+    if(editingPreset === num) return;
+    applyPreset(num-1);
+}
+
+function editPreset(num) {
+    if(editingPreset) {
+        document.getElementById(`preset${editingPreset}`).classList.remove('editing');
+    }
+    editingPreset = num;
+    document.getElementById(`preset${num}`).classList.add('editing');
+}
+
+function applyPreset(index) {
+    const preset = presets[index];
+    setC(preset.r, preset.g, preset.b);
+    setB(preset.brightness);
+    clr = {r: preset.r, g: preset.g, b: preset.b};
+    pwr = 1;
+    document.getElementById('powerBtn').textContent='Power Off';
+    document.getElementById('powerBtn').classList.add('on');
+}
+
+function updatePresetDisplays() {
+    presets.forEach((preset, i) => {
+        const el = document.getElementById(`preset${i+1}`);
+        el.style.background = `rgb(${preset.r},${preset.g},${preset.b})`;
+        el.title = `Color: ${preset.r},${preset.g},${preset.b} | Brightness: ${preset.brightness}%`;
+    });
 }
 
 function hoverPower(){
