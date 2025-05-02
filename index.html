@@ -2,96 +2,78 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>BLEDOM Controller</title>
+    <title>BLEDOM</title>
     <style>
-        :root { --bg-dark: #0a192f; --accent: #3b82f6; --text: #e6f1ff; }
-        body { background: var(--bg-dark); color: var(--text); font-family: sans-serif; text-align: center; margin: 20px; }
-        #color-triangle { width: 200px; height: 173px; margin: 20px auto; position: relative; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-        #color-triangle div { position: absolute; width: 100%; height: 100%; mix-blend-mode: screen; }
-        #brightness { width: 200px; margin: 20px auto; accent-color: var(--accent); }
-        button { padding: 12px 24px; font-size: 16px; border: none; border-radius: 6px; cursor: pointer; transition: 0.3s; }
-        #connectBtn { background: var(--accent); color: white; }
-        #powerBtn { background: #444; color: white; }
-        #powerBtn.on { background: var(--accent); box-shadow: 0 0 15px var(--accent); }
-        #status { margin: 15px 0; min-height: 20px; }
+        body{background:#0a192f;color:#e6f1ff;font-family:sans-serif;text-align:center;margin:20px;}
+        #color-triangle{width:200px;height:173px;margin:10px auto;position:relative;clip-path:polygon(50% 0,100% 100%,0 100%);background:conic-gradient(red,lime,blue,red);}
+        #brightness{width:200px;margin:10px auto;accent-color:#3b82f6;}
+        button{padding:12px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:5px;}
+        #connectBtn{background:#3b82f6;color:white;}
+        #powerBtn{background:#444;color:white;}
+        #powerBtn.on{background:#3b82f6;box-shadow:0 0 15px #3b82f6;}
     </style>
 </head>
 <body>
-    <div id="nosupport" style="display:none"><h1>Bluetooth not supported</h1><p>Enable experimental web features in chrome://flags</p></div>
+    <div id="nosupport" style="display:none"><h1>No Bluetooth</h1><p>Enable in chrome://flags</p></div>
     <div id="interface" style="display:none">
-        <h1>BLEDOM Controller</h1>
-        <div id="status">Click Connect to pair device</div>
-        <button id="connectBtn" onclick="handleConnect()">Connect</button>
+        <h1>BLEDOM</h1>
+        <div id="status">Click Connect</div>
+        <button id="connectBtn" onclick="hc()">Connect</button>
         <div id="controls" style="display:none">
-            <div id="color-triangle"><div style="background:red"></div><div style="background:lime"></div><div style="background:blue"></div></div>
-            <input type="range" id="brightness" min="0" max="100" value="100">
-            <button id="powerBtn" onclick="togglePower()">Power Off</button>
+            <button id="powerBtn" onmouseover="hoverPower()" onmouseout="unhoverPower()" onclick="togglePower()">Power Off</button>
+            <div id="color-triangle" onclick="setTriangleColor(event)"></div>
+            <input type="range" id="brightness" min="0" max="100" value="100" oninput="setB(this.value)">
         </div>
     </div>
 
 <script>
-let d=null,c=null,color={r:255,g:255,b:255},STORAGE={ID:'bledom_id',NAME:'bledom_name'};
-window.addEventListener('load',()=>{
-    if(!navigator.bluetooth) document.getElementById('nosupport').style.display='block';
+let d=null,c=null,clr={r:255,g:255,b:255},pwr=1;
+window.onload=()=>{
+    if(!navigator.bluetooth)document.getElementById('nosupport').style.display='block';
     else document.getElementById('interface').style.display='block';
-    if(localStorage.getItem(STORAGE.NAME)) updateStatus(`Saved device: ${localStorage.getItem(STORAGE.NAME)}`);
-});
+};
 
-async function handleConnect(){
+async function hc(){
     try{
-        const id=localStorage.getItem(STORAGE.ID);
-        if(id){
-            updateStatus('Reconnecting...');
-            const devices=await navigator.bluetooth.getDevices(),saved=devices.find(d=>d.id===id);
-            if(saved&&saved.gatt){d=saved;await connect();return;}
-            d=await navigator.bluetooth.requestDevice({deviceId:id,optionalServices:['0000fff0-0000-1000-8000-00805f9b34fb']});
-            await connect();
-        }else{
-            updateStatus('Select device...');
-            d=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:['0000fff0-0000-1000-8000-00805f9b34fb']});
-            localStorage.setItem(STORAGE.ID,d.id);
-            localStorage.setItem(STORAGE.NAME,d.name||'Unknown Device');
-            await connect();
-        }
-    }catch(e){updateStatus(`Error: ${e.message}`,1);}
+        if(d&&d.gatt.connected)return;
+        d=await navigator.bluetooth.requestDevice({
+            acceptAllDevices:true,
+            optionalServices:['0000fff0-0000-1000-8000-00805f9b34fb']
+        });
+        d.addEventListener('gattserverdisconnected',()=>{
+            document.getElementById('connectBtn').style.display='block';
+            document.getElementById('controls').style.display='none';
+        });
+        const s=await d.gatt.connect(),v=await s.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
+        c=await v.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
+        document.getElementById('connectBtn').style.display='none';
+        document.getElementById('controls').style.display='block';
+    }catch(e){document.getElementById('status').textContent=`Error: ${e}`;}
 }
 
-async function connect(){
-    d.addEventListener('gattserverdisconnected',()=>{
-        updateStatus('Disconnected. Click Connect.',1);
-        d=null;c=null;
-        document.getElementById('connectBtn').style.display='block';
-        document.getElementById('controls').style.display='none';
-    });
-    const s=await d.gatt.connect(),v=await s.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
-    c=await v.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
-    document.getElementById('connectBtn').style.display='none';
-    document.getElementById('controls').style.display='block';
-    document.getElementById('powerBtn').classList.add('on');
-    updateStatus(`Connected to ${d.name||'device'}`);
+function sc(cmd){return c?c.writeValue(cmd):Promise.reject();}
+function setC(r,g,b){clr={r,g,b};return sc(new Uint8Array([0x7e,0,5,3,r,g,b,0,0xef]));}
+function setB(v){return sc(new Uint8Array([0x7e,0,1,v,0,0,0,0,0xef]));}
+
+function hoverPower(){
+    if(pwr)sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef]));
 }
-
-function updateStatus(m,e=0){const s=document.getElementById('status');s.textContent=m;s.style.color=e?'#f44':'inherit';}
-function sendCmd(cmd){return c?c.writeValue(cmd):Promise.reject();}
-function setColor(r,g,b){color={r,g,b};return sendCmd(new Uint8Array([0x7e,0,5,3,r,g,b,0,0xef]));}
-function setBrightness(v){return sendCmd(new Uint8Array([0x7e,0,1,v,0,0,0,0,0xef]));}
-
+function unhoverPower(){
+    if(pwr)sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef])).then(()=>setC(clr.r,clr.g,clr.b));
+}
 function togglePower(){
-    const p=document.getElementById('powerBtn'),o=p.classList.contains('on');
-    sendCmd(new Uint8Array([0x7e,0,4,o?0:1,0,0,0,0xef])).then(()=>{
-        p.textContent=o?'Power On':'Power Off';
-        p.classList.toggle('on');
-        if(!o) setColor(color.r,color.g,color.b);
-    });
+    pwr=!pwr;
+    const p=document.getElementById('powerBtn');
+    p.textContent=pwr?'Power Off':'Power On';
+    p.classList.toggle('on');
+    sc(new Uint8Array([0x7e,0,4,pwr?1:0,0,0,0,0xef])).then(()=>pwr&&setC(clr.r,clr.g,clr.b));
 }
 
-document.getElementById('color-triangle').addEventListener('click',e=>{
+function setTriangleColor(e){
     const t=e.target.getBoundingClientRect(),x=e.clientX-t.left,y=e.clientY-t.top;
-    const r=Math.min(255,Math.max(0,510-(x/y)*510)),b=Math.min(255,Math.max(0,510-((200-x)/y)*510));
-    setColor(r,255-r-b,b);
-});
-
-document.getElementById('brightness').addEventListener('input',e=>setBrightness(e.target.value));
+    const r=Math.min(255,510-(x/y)*510),b=Math.min(255,510-((200-x)/y)*510);
+    setC(r,255-r-b,b);
+}
 </script>
 </body>
 </html>
