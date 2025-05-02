@@ -108,9 +108,7 @@
                 document.getElementById('connectBtn').style.display = 'none';
                 document.getElementById('controls').style.display = 'block';
                 
-                // Initialize with white color at full brightness
-                setBrightness(100);
-                setColor(255, 255, 255);
+                // Don't send any initial commands - just show controls
                 document.getElementById('powerBtn').classList.add('on');
                 
             } catch(error) {
