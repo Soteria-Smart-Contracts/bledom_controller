@@ -29,7 +29,7 @@ function searchBLEDom() {
 		return server.getPrimaryService('6EC0E3DC-3B16-4A6E-A2B0-990254ADACF4');
 	}).then(function(service) {
 		console.log(service);
-		return service.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
+		return service.getCharacteristic('6EC0E3DC-3B16-4A6E-A2B0-990254ADACF4');
 	}).then(function(characteristic) {
 		console.log(characteristic);
 		char = characteristic;
