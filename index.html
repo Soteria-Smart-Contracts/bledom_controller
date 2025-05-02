@@ -50,33 +50,47 @@ window.onload=()=>{
     else document.getElementById('interface').style.display='block';
 };
 
-async function hc(){
-    try{
-        d=await navigator.bluetooth.requestDevice({
-            acceptAllDevices:true,
-            optionalServices:['0000fff0-0000-1000-8000-00805f9b34fb']
+async function hc() {
+    try {
+        d = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: ['0000fff0-0000-1000-8000-00805f9b34fb']
         });
-        d.addEventListener('gattserverdisconnected',()=>{
-            document.getElementById('connectBtn').style.display='block';
-            document.getElementById('controls').style.display='none';
+        
+        d.addEventListener('gattserverdisconnected', () => {
+            document.getElementById('connectBtn').style.display = 'block';
+            document.getElementById('controls').style.display = 'none';
             isConnected = false;
         });
-        const s=await d.gatt.connect();
-        const v=await s.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
-        c=await v.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
-        document.getElementById('connectBtn').style.display='none';
-        document.getElementById('controls').style.display='block';
+
+        const s = await d.gatt.connect();
+        const v = await s.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
+        c = await v.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
+        
+        document.getElementById('connectBtn').style.display = 'none';
+        document.getElementById('controls').style.display = 'block';
         isConnected = true;
+
+        // Set initial state
+        clr = {r: 255, g: 59.925, b: 0};  // Store the color
+        pwr = 1;  // Lights on
         
-        // Quick on/off pulse to activate hover
-        console.log("Sending activation pulse...");
-        await sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef])); // Off
-        await new Promise(resolve => setTimeout(resolve, 100));
-        await sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef])); // On
-        console.log("Activation pulse complete");
+        // Send commands
+        await sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef]));  // Power on
+        await sc(new Uint8Array([0x7e,0,1,18,0,0,0,0,0xef]));  // Brightness 18
+        await sc(new Uint8Array([0x7e,0,5,3,255,60,0,0,0xef]));  // Color (rounded g to 60)
         
-    }catch(e){console.error('Connection error:',e);}
+        // Update UI
+        document.getElementById('powerBtn').textContent = 'Power Off';
+        document.getElementById('powerBtn').classList.add('on');
+        document.getElementById('brightness').value = 18;
+
+    } catch(e) {
+        console.error('Connection error:', e);
+        alert('Connection error: ' + e.message);
+    }
 }
+
 
 function sc(cmd){return c?.writeValue(cmd)??Promise.reject();}
 function setC(r,g,b){clr={r,g,b};return sc(new Uint8Array([0x7e,0,5,3,r,g,b,0,0xef]));}
