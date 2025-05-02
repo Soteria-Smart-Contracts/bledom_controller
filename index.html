@@ -68,12 +68,14 @@ async function hc(){
         document.getElementById('controls').style.display='block';
         isConnected = true;
         
-        // Quick "ping" to activate controller without changing state
-        await sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef])); // Turn on
-        await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay
-        await sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef])); // Send same state again
+        // Quick on/off pulse to activate hover
+        console.log("Sending activation pulse...");
+        await sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef])); // Off
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef])); // On
+        console.log("Activation pulse complete");
         
-    }catch(e){alert('Connection error:'+e);}
+    }catch(e){console.error('Connection error:',e);}
 }
 
 function sc(cmd){return c?.writeValue(cmd)??Promise.reject();}
