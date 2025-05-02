@@ -5,7 +5,7 @@
     <title>BLEDOM</title>
     <style>
         body{background:#0a192f;color:#e6f1ff;font-family:sans-serif;text-align:center;margin:20px;}
-        #color-triangle{width:200px;height:173px;margin:10px auto;position:relative;clip-path:polygon(50% 0,100% 100%,0 100%);background:conic-gradient(red,lime,blue,red);}
+        #color-square{width:200px;height:200px;margin:10px auto;background:linear-gradient(to right, red, yellow, lime, cyan, blue, magenta, red);cursor:crosshair;}
         #brightness{width:200px;margin:10px auto;accent-color:#3b82f6;}
         button{padding:12px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:5px;}
         #connectBtn{background:#3b82f6;color:white;}
@@ -21,13 +21,13 @@
         <button id="connectBtn" onclick="hc()">Connect</button>
         <div id="controls" style="display:none">
             <button id="powerBtn" onmouseover="hoverPower()" onmouseout="unhoverPower()" onclick="togglePower()">Power Off</button>
-            <div id="color-triangle" onclick="setTriangleColor(event)"></div>
+            <div id="color-square" onclick="setColor(event)"></div>
             <input type="range" id="brightness" min="0" max="100" value="100" oninput="setB(this.value)">
         </div>
     </div>
 
 <script>
-let d=null,c=null,clr={r:255,g:255,b:255},pwr=1;
+let d=null,c=null,clr={r:255,g:0,b:0},pwr=1;
 window.onload=()=>{
     if(!navigator.bluetooth)document.getElementById('nosupport').style.display='block';
     else document.getElementById('interface').style.display='block';
@@ -35,7 +35,7 @@ window.onload=()=>{
 
 async function hc(){
     try{
-        if(d&&d.gatt.connected)return;
+        if(d?.gatt?.connected)return;
         d=await navigator.bluetooth.requestDevice({
             acceptAllDevices:true,
             optionalServices:['0000fff0-0000-1000-8000-00805f9b34fb']
@@ -51,28 +51,28 @@ async function hc(){
     }catch(e){document.getElementById('status').textContent=`Error: ${e}`;}
 }
 
-function sc(cmd){return c?c.writeValue(cmd):Promise.reject();}
+function sc(cmd){return c?.writeValue(cmd)??Promise.reject();}
 function setC(r,g,b){clr={r,g,b};return sc(new Uint8Array([0x7e,0,5,3,r,g,b,0,0xef]));}
 function setB(v){return sc(new Uint8Array([0x7e,0,1,v,0,0,0,0,0xef]));}
 
-function hoverPower(){
-    if(pwr)sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef]));
+function setColor(e){
+    const rect=e.target.getBoundingClientRect();
+    const x=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+    const y=Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height));
+    const r=Math.round(255*(1-y)*x);
+    const g=Math.round(255*(1-y));
+    const b=Math.round(255*(1-x));
+    setC(r,g,b);
 }
-function unhoverPower(){
-    if(pwr)sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef])).then(()=>setC(clr.r,clr.g,clr.b));
-}
+
+function hoverPower(){if(pwr)sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef]));}
+function unhoverPower(){if(pwr)sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef]));}
 function togglePower(){
     pwr=!pwr;
     const p=document.getElementById('powerBtn');
     p.textContent=pwr?'Power Off':'Power On';
     p.classList.toggle('on');
     sc(new Uint8Array([0x7e,0,4,pwr?1:0,0,0,0,0xef])).then(()=>pwr&&setC(clr.r,clr.g,clr.b));
-}
-
-function setTriangleColor(e){
-    const t=e.target.getBoundingClientRect(),x=e.clientX-t.left,y=e.clientY-t.top;
-    const r=Math.min(255,510-(x/y)*510),b=Math.min(255,510-((200-x)/y)*510);
-    setC(r,255-r-b,b);
 }
 </script>
 </body>
