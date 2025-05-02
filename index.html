@@ -10,8 +10,16 @@
         button{padding:12px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:5px;transition:all 0.3s;}
         #connectBtn{background:#3b82f6;color:white;}
         #powerBtn,#previewBtn{min-width:120px;}
-        #powerBtn{background:#444;color:white;}
+        #powerBtn{background:#444;color:white;transition: all 0.2s ease;}
         #powerBtn.on,#previewBtn.on{background:#3b82f6;box-shadow:0 0 15px #3b82f6;}
+        #powerBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+        #powerBtn.hover-effect {
+            background: #3b82f6;
+            box-shadow: 0 0 15px #3b82f6;
+        }
     </style>
 </head>
 <body>
@@ -29,7 +37,13 @@
     </div>
 
 <script>
-let d=null,c=null,clr={r:255,g:0,b:0},pwr=1,preview=1,cooldown=0;
+let d = null;
+let c = null;
+let clr = {r:255,g:0,b:0};
+let pwr = 1;
+let preview = 1;
+let cooldown = 0;
+let isConnected = false;
 
 window.onload=()=>{
     if(!navigator.bluetooth)document.getElementById('nosupport').style.display='block';
@@ -45,12 +59,16 @@ async function hc(){
         d.addEventListener('gattserverdisconnected',()=>{
             document.getElementById('connectBtn').style.display='block';
             document.getElementById('controls').style.display='none';
+            isConnected = false;
         });
         const s=await d.gatt.connect();
         const v=await s.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
         c=await v.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
         document.getElementById('connectBtn').style.display='none';
         document.getElementById('controls').style.display='block';
+        isConnected = true;
+        // Initialize lights to on state
+        sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef])).then(()=>setC(clr.r,clr.g,clr.b));
     }catch(e){alert('Connection error:'+e);}
 }
 
@@ -76,13 +94,25 @@ function lockColor(e){
 }
 
 function hoverPower(){
-    if(pwr) sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef]));
-    else sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef]));
+    if (!isConnected) return;
+    const btn = document.getElementById('powerBtn');
+    btn.classList.add('hover-effect');
+    if(pwr) {
+        sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef]));
+    } else {
+        sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef]));
+    }
 }
+
 function unhoverPower(){
+    if (!isConnected) return;
+    const btn = document.getElementById('powerBtn');
+    btn.classList.remove('hover-effect');
     sc(new Uint8Array([0x7e,0,4,pwr?1:0,0,0,0,0xef]));
 }
+
 function lockPower(){
+    if (!isConnected) return;
     pwr=!pwr;
     const p=document.getElementById('powerBtn');
     p.textContent=pwr?'Power Off':'Power On';
