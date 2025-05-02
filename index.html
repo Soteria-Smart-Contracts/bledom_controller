@@ -5,7 +5,7 @@
     <title>BLEDOM</title>
     <style>
         body{background:#0a192f;color:#e6f1ff;font-family:sans-serif;text-align:center;margin:20px;}
-        #color-triangle{width:400px;height:346px;margin:10px auto;position:relative;clip-path:polygon(50% 0,100% 100%,0 100%);background:conic-gradient(red 0deg, yellow 60deg, lime 120deg, cyan 180deg, blue 240deg, magenta 300deg, red 360deg);}
+        #color-triangle{width:400px;height:346px;margin:10px auto;clip-path:polygon(50% 0,100% 100%,0 100%);background:linear-gradient(to bottom right,red 0%,#0f0 50%,blue 100%);}
         #brightness{width:400px;margin:10px auto;accent-color:#3b82f6;}
         button{padding:12px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:5px;}
         #connectBtn{background:#3b82f6;color:white;}
@@ -18,76 +18,51 @@
     <div id="interface" style="display:none">
         <h1>BLEDOM</h1>
         <div id="status">Click Connect</div>
-        <button id="connectBtn" onclick="hc()">Connect</button>
+        <button id="connectBtn" onclick="C()">Connect</button>
         <div id="controls" style="display:none">
-            <button id="powerBtn" onmouseover="hoverPower()" onmouseout="unhoverPower()" onclick="togglePower()">Power Off</button>
-            <div id="color-triangle" onmousemove="setColorFromPos(event)" onclick="lockColor()"></div>
-            <input type="range" id="brightness" min="0" max="100" value="100" oninput="setB(this.value)" onchange="setB(this.value)">
+            <button id="powerBtn" onmouseover="P(0)" onmouseout="P(1)" onclick="T()">Power Off</button>
+            <div id="color-triangle" onmousemove="S(event)"></div>
+            <input type="range" id="brightness" min="0" max="100" value="100" oninput="B(this.value)">
         </div>
     </div>
 
 <script>
-let d=null,c=null,clr={r:255,g:255,b:255},pwr=1,colorLocked=false;
-window.onload=()=>{
-    if(!navigator.bluetooth)document.getElementById('nosupport').style.display='block';
-    else document.getElementById('interface').style.display='block';
-};
+let d=null,c=null,clr={r:255,g:255,b:255},p=1,oL=1;
+window.onload=()=>navigator.bluetooth?document.getElementById('interface').style.display='block':document.getElementById('nosupport').style.display='block';
 
-async function hc(){
+async function C(){
     try{
-        if(d&&d.gatt.connected)return;
-        d=await navigator.bluetooth.requestDevice({
-            acceptAllDevices:true,
-            optionalServices:['0000fff0-0000-1000-8000-00805f9b34fb']
-        });
-        d.addEventListener('gattserverdisconnected',()=>{
-            document.getElementById('connectBtn').style.display='block';
-            document.getElementById('controls').style.display='none';
-        });
-        const s=await d.gatt.connect(),v=await s.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
+        d=await navigator.bluetooth.requestDevice({acceptAllDevices:1,optionalServices:['0000fff0-0000-1000-8000-00805f9b34fb']});
+        d.addEventListener('gattserverdisconnected',_=>document.getElementById('connectBtn').style.display='block');
+        let s=await d.gatt.connect(),v=await s.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
         c=await v.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
         document.getElementById('connectBtn').style.display='none';
         document.getElementById('controls').style.display='block';
-    }catch(e){document.getElementById('status').textContent=`Error: ${e}`;}
+    }catch(e){document.getElementById('status').textContent=e;}
 }
 
-function sc(cmd){return c?c.writeValue(cmd):Promise.reject();}
-function setC(r,g,b){clr={r,g,b};return sc(new Uint8Array([0x7e,0,5,3,r,g,b,0,0xef]));}
-function setB(v){return sc(new Uint8Array([0x7e,0,1,v,0,0,0,0,0xef]));}
-
-function setColorFromPos(e){
-    if(colorLocked) return;
-    const t=e.target.getBoundingClientRect();
-    const x=e.clientX-t.left,y=e.clientY-t.top;
-    const h=Math.atan2(y-346,x-200)*180/Math.PI+180;
-    const s=Math.min(1,y/346*2);
-    const rgb=hsvToRgb(h/360,s,1);
-    setC(rgb.r,rgb.g,rgb.b);
+function X(cmd){return c?c.writeValue(cmd):0;}
+function S(e){
+    let t=e.target.getBoundingClientRect(),x=e.clientX-t.left,y=e.clientY-t.top;
+    let r=Math.min(255,x/t.width*510),b=Math.min(255,(t.height-y)/t.height*510),g=255-Math.max(r,b);
+    X(new Uint8Array([0x7e,0,5,3,r,g,b,0,0xef]));
 }
 
-function lockColor(){colorLocked=!colorLocked;}
+function B(v){X(new Uint8Array([0x7e,0,1,v,0,0,0,0,0xef]));}
 
-function hsvToRgb(h,s,v){
-    let r,g,b,i=Math.floor(h*6),f=h*6-i,p=v*(1-s),q=v*(1-f*s),t=v*(1-(1-f)*s);
-    switch(i%6){
-        case 0:r=v,g=t,b=p;break;
-        case 1:r=q,g=v,b=p;break;
-        case 2:r=p,g=v,b=t;break;
-        case 3:r=p,g=q,b=v;break;
-        case 4:r=t,g=p,b=v;break;
-        case 5:r=v,g=p,b=q;break;
-    }
-    return{r:Math.round(r*255),g:Math.round(g*255),b:Math.round(b*255)};
+function P(s){
+    if(s===p)return;
+    X(new Uint8Array([0x7e,0,4,s,0,0,0,0xef]));
+    if(s)X(new Uint8Array([0x7e,0,5,3,clr.r,clr.g,clr.b,0,0xef]));
+    if(!oL)p=s;
 }
 
-function hoverPower(){if(pwr)sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef]));}
-function unhoverPower(){if(pwr)sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef])).then(()=>setC(clr.r,clr.g,clr.b));}
-function togglePower(){
-    pwr=!pwr;
-    const p=document.getElementById('powerBtn');
-    p.textContent=pwr?'Power Off':'Power On';
-    p.classList.toggle('on');
-    sc(new Uint8Array([0x7e,0,4,pwr?1:0,0,0,0,0xef])).then(()=>pwr&&setC(clr.r,clr.g,clr.b));
+function T(){
+    oL=!oL;
+    let b=document.getElementById('powerBtn');
+    b.textContent=oL?'Power Off':'Power On';
+    b.classList.toggle('on');
+    p=oL;
 }
 </script>
 </body>
