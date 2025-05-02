@@ -2,32 +2,34 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>BLEDOM</title>
+    <title>BLEDOM Web Controller</title>
     <style>
-        body{background:#0a192f;color:#e6f1ff;font-family:sans-serif;text-align:center;margin:20px;}
-        #color-square{width:200px;height:200px;margin:10px auto;background:linear-gradient(to right, red, yellow, lime, cyan, blue, magenta, red);cursor:crosshair;}
-        #brightness{width:200px;margin:10px auto;accent-color:#3b82f6;}
-        button{padding:12px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:5px;}
+        body{background:#0a192f;color:#e6f1ff;font-family:sans-serif;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;margin:0;}
+        #color-rect{width:600px;height:150px;background:linear-gradient(to right,red,yellow,lime,cyan,blue,magenta,red);cursor:crosshair;margin:20px 0;}
+        #brightness{width:600px;margin:20px 0;}
+        button{padding:12px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:5px;transition:all 0.3s;}
         #connectBtn{background:#3b82f6;color:white;}
+        #powerBtn,#previewBtn{min-width:120px;}
         #powerBtn{background:#444;color:white;}
-        #powerBtn.on{background:#3b82f6;box-shadow:0 0 15px #3b82f6;}
+        #powerBtn.on,#previewBtn.on{background:#3b82f6;box-shadow:0 0 15px #3b82f6;}
     </style>
 </head>
 <body>
     <div id="nosupport" style="display:none"><h1>No Bluetooth</h1><p>Enable in chrome://flags</p></div>
-    <div id="interface" style="display:none">
-        <h1>BLEDOM</h1>
-        <div id="status">Click Connect</div>
+    <div id="interface" style="display:none;text-align:center">
+        <h1>BLEDOM Web Controller</h1>
         <button id="connectBtn" onclick="hc()">Connect</button>
         <div id="controls" style="display:none">
-            <button id="powerBtn" onmouseover="hoverPower()" onmouseout="unhoverPower()" onclick="togglePower()">Power Off</button>
-            <div id="color-square" onclick="setColor(event)"></div>
+            <button id="powerBtn" onmouseover="hoverPower()" onmouseout="unhoverPower()" onclick="lockPower()">Power Off</button>
             <input type="range" id="brightness" min="0" max="100" value="100" oninput="setB(this.value)">
+            <div id="color-rect" onmousemove="previewColor(event)" onclick="lockColor(event)"></div>
+            <button id="previewBtn" class="on" onclick="togglePreview()">Preview: ON</button>
         </div>
     </div>
 
 <script>
-let d=null,c=null,clr={r:255,g:0,b:0},pwr=1;
+let d=null,c=null,clr={r:255,g:0,b:0},pwr=1,preview=1,cooldown=0;
+
 window.onload=()=>{
     if(!navigator.bluetooth)document.getElementById('nosupport').style.display='block';
     else document.getElementById('interface').style.display='block';
@@ -35,7 +37,6 @@ window.onload=()=>{
 
 async function hc(){
     try{
-        if(d?.gatt?.connected)return;
         d=await navigator.bluetooth.requestDevice({
             acceptAllDevices:true,
             optionalServices:['0000fff0-0000-1000-8000-00805f9b34fb']
@@ -44,35 +45,62 @@ async function hc(){
             document.getElementById('connectBtn').style.display='block';
             document.getElementById('controls').style.display='none';
         });
-        const s=await d.gatt.connect(),v=await s.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
+        const s=await d.gatt.connect();
+        const v=await s.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
         c=await v.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
         document.getElementById('connectBtn').style.display='none';
         document.getElementById('controls').style.display='block';
-    }catch(e){document.getElementById('status').textContent=`Error: ${e}`;}
+    }catch(e){alert('Connection error:'+e);}
 }
 
 function sc(cmd){return c?.writeValue(cmd)??Promise.reject();}
 function setC(r,g,b){clr={r,g,b};return sc(new Uint8Array([0x7e,0,5,3,r,g,b,0,0xef]));}
 function setB(v){return sc(new Uint8Array([0x7e,0,1,v,0,0,0,0,0xef]));}
 
-function setColor(e){
+function previewColor(e){
+    if(!preview||cooldown||!pwr)return;
     const rect=e.target.getBoundingClientRect();
-    const x=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
-    const y=Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height));
-    const r=Math.round(255*(1-y)*x);
-    const g=Math.round(255*(1-y));
-    const b=Math.round(255*(1-x));
-    setC(r,g,b);
+    const x=(e.clientX-rect.left)/rect.width;
+    const rgb=hsvToRgb(x*360,1,1);
+    setC(rgb.r,rgb.g,rgb.b);
+}
+
+function lockColor(e){
+    const rect=e.target.getBoundingClientRect();
+    const x=(e.clientX-rect.left)/rect.width;
+    const rgb=hsvToRgb(x*360,1,1);
+    setC(rgb.r,rgb.g,rgb.b);
+    cooldown=1;
+    setTimeout(()=>cooldown=0,5000);
 }
 
 function hoverPower(){if(pwr)sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef]));}
 function unhoverPower(){if(pwr)sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef]));}
-function togglePower(){
+function lockPower(){
     pwr=!pwr;
     const p=document.getElementById('powerBtn');
     p.textContent=pwr?'Power Off':'Power On';
     p.classList.toggle('on');
     sc(new Uint8Array([0x7e,0,4,pwr?1:0,0,0,0,0xef])).then(()=>pwr&&setC(clr.r,clr.g,clr.b));
+}
+
+function togglePreview(){
+    preview=!preview;
+    const p=document.getElementById('previewBtn');
+    p.textContent=`Preview: ${preview?'ON':'OFF'}`;
+    p.classList.toggle('on');
+}
+
+function hsvToRgb(h,s,v){
+    h/=60;let i=Math.floor(h),f=h-i,p=v*(1-s),q=v*(1-f*s),t=v*(1-(1-f)*s);
+    switch(i%6){
+        case 0:return{r:v*255,g:t*255,b:p*255};
+        case 1:return{r:q*255,g:v*255,b:p*255};
+        case 2:return{r:p*255,g:v*255,b:t*255};
+        case 3:return{r:p*255,g:q*255,b:v*255};
+        case 4:return{r:t*255,g:p*255,b:v*255};
+        default:return{r:v*255,g:p*255,b:q*255};
+    }
 }
 </script>
 </body>
