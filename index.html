@@ -61,6 +61,8 @@
 			async function searchBLEDom() {
 				try {
 					device = await navigator.bluetooth.requestDevice({
+						filters: [],
+						optionalServices: ['0000ffe5-0000-1000-8000-00805f9a34fb']
 					});
 					
 					const server = await device.gatt.connect();
