@@ -70,18 +70,24 @@
     </div>
 
     <script>
-        // Bluetooth variables
+// Bluetooth variables
         let device = null;
         let characteristic = null;
         let commandInProgress = false;
         let currentColor = { r: 255, g: 255, b: 255 };
 
-        // Initial Bluetooth check
-        if (navigator.bluetooth) {
-            document.getElementById('interface').style.display = 'block';
-        } else {
-            document.getElementById('nosupport').style.display = 'block';
-        }
+        // Check for cached device on load
+        window.addEventListener('load', () => {
+            if (navigator.bluetooth) {
+                document.getElementById('interface').style.display = 'block';
+                const cachedDeviceId = localStorage.getItem('bledomDeviceId');
+                if (cachedDeviceId) {
+                    connectToCachedDevice(cachedDeviceId);
+                }
+            } else {
+                document.getElementById('nosupport').style.display = 'block';
+            }
+        });
 
         // Bluetooth functions
         function onDisconnected(event) {
@@ -90,6 +96,7 @@
             characteristic = null;
             document.getElementById('connectBtn').style.display = 'block';
             document.getElementById('controls').style.display = 'none';
+            localStorage.removeItem('bledomDeviceId'); // Clear cache on disconnect
         }
 
         async function connect() {
@@ -99,23 +106,49 @@
                     optionalServices: ['0000fff0-0000-1000-8000-00805f9b34fb']
                 });
 
-                device.addEventListener('gattserverdisconnected', onDisconnected);
+                // Cache the device ID
+                localStorage.setItem('bledomDeviceId', device.id);
                 
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
-                characteristic = await service.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
-                
-                document.getElementById('connectBtn').style.display = 'none';
-                document.getElementById('controls').style.display = 'block';
-                
-                // Don't send any initial commands - just show controls
-                document.getElementById('powerBtn').classList.add('on');
+                completeConnection(device);
                 
             } catch(error) {
                 console.error('Connection failed:', error);
                 alert('Connection error: ' + error.message);
             }
         }
+
+        async function connectToCachedDevice(deviceId) {
+            try {
+                // Try to reconnect using the cached device ID
+                device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['0000fff0-0000-1000-8000-00805f9b34fb'],
+                    deviceId: deviceId
+                });
+                
+                completeConnection(device);
+                
+            } catch(error) {
+                console.log('Cached device not found, showing device list');
+                // If cached device fails, proceed with normal connection
+                connect();
+            }
+        }
+
+        async function completeConnection(device) {
+            device.addEventListener('gattserverdisconnected', onDisconnected);
+            
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
+            characteristic = await service.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
+            
+            document.getElementById('connectBtn').style.display = 'none';
+            document.getElementById('controls').style.display = 'block';
+            
+            // Don't send any initial commands - just show controls
+            document.getElementById('powerBtn').classList.add('on');
+        }
+
 
         function sendCommand(command) {
             if (!commandInProgress && characteristic) {
