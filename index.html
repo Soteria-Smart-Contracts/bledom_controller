@@ -2,219 +2,77 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>BLEDOM Controller</title>
+    <title>BLEDOM</title>
     <style>
-        body {
-            background: #0a192f;
-            color: #e6f1ff;
-            font-family: sans-serif;
-            text-align: center;
-            margin: 20px;
-        }
-        #color-triangle {
-            width: 400px;
-            height: 346px;
-            margin: 20px auto;
-            position: relative;
-            clip-path: polygon(50% 0, 100% 100%, 0 100%);
-            background: conic-gradient(red 0deg, #ff0 60deg, lime 120deg, cyan 180deg, blue 240deg, magenta 300deg, red 360deg);
-            cursor: crosshair;
-        }
-        #brightness {
-            width: 400px;
-            margin: 20px auto;
-            accent-color: #3b82f6;
-        }
-        button {
-            padding: 12px 24px;
-            font-size: 16px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            margin: 5px;
-            transition: 0.2s;
-        }
-        #connectBtn {
-            background: #3b82f6;
-            color: white;
-        }
-        #powerBtn {
-            background: #444;
-            color: white;
-        }
-        #powerBtn.on {
-            background: #3b82f6;
-            box-shadow: 0 0 15px #3b82f6;
-        }
-        #previewToggle {
-            background: #555;
-            color: white;
-        }
-        #previewToggle.on {
-            background: #3b82f6;
-        }
+        body{background:#0a192f;color:#e6f1ff;font-family:sans-serif;text-align:center;margin:20px;}
+        #color-triangle{width:200px;height:173px;margin:10px auto;position:relative;clip-path:polygon(50% 0,100% 100%,0 100%);background:conic-gradient(red,lime,blue,red);}
+        #brightness{width:200px;margin:10px auto;accent-color:#3b82f6;}
+        button{padding:12px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:5px;}
+        #connectBtn{background:#3b82f6;color:white;}
+        #powerBtn{background:#444;color:white;}
+        #powerBtn.on{background:#3b82f6;box-shadow:0 0 15px #3b82f6;}
     </style>
 </head>
 <body>
-    <div id="nosupport" style="display: none">
-        <h1>Bluetooth Not Supported</h1>
-        <p>Enable experimental web features in chrome://flags</p>
-    </div>
-    <div id="interface" style="display: none">
-        <h1>BLEDOM Controller</h1>
-        <div id="status">Click Connect to pair device</div>
-        <button id="connectBtn" onclick="handleConnect()">Connect</button>
-        <div id="controls" style="display: none">
-            <div>
-                <button id="powerBtn" 
-                        onmouseover="handlePowerHover(true)" 
-                        onmouseout="handlePowerHover(false)" 
-                        onclick="togglePower()">Power Off</button>
-                <button id="previewToggle" onclick="togglePreview()">Preview: ON</button>
-            </div>
-            <div id="color-triangle" 
-                 onmousemove="handleColorHover(event)" 
-                 onclick="selectColor(event)"></div>
-            <input type="range" id="brightness" min="0" max="100" value="100" 
-                   oninput="handleBrightnessChange(event)">
+    <div id="nosupport" style="display:none"><h1>No Bluetooth</h1><p>Enable in chrome://flags</p></div>
+    <div id="interface" style="display:none">
+        <h1>BLEDOM</h1>
+        <div id="status">Click Connect</div>
+        <button id="connectBtn" onclick="hc()">Connect</button>
+        <div id="controls" style="display:none">
+            <button id="powerBtn" onmouseover="hoverPower()" onmouseout="unhoverPower()" onclick="togglePower()">Power Off</button>
+            <div id="color-triangle" onclick="setTriangleColor(event)"></div>
+            <input type="range" id="brightness" min="0" max="100" value="100" oninput="setB(this.value)">
         </div>
     </div>
 
 <script>
-let device = null;
-let characteristic = null;
-let currentColor = { r: 255, g: 255, b: 255 };
-let isPoweredOn = true;
-let isHoveringPower = false;
-let previewEnabled = true;
-let colorSelectCooldown = false;
+let d=null,c=null,clr={r:255,g:255,b:255},pwr=1;
+window.onload=()=>{
+    if(!navigator.bluetooth)document.getElementById('nosupport').style.display='block';
+    else document.getElementById('interface').style.display='block';
+};
 
-// Initialize
-window.addEventListener('load', () => {
-    if (!navigator.bluetooth) {
-        document.getElementById('nosupport').style.display = 'block';
-        return;
-    }
-    document.getElementById('interface').style.display = 'block';
-});
-
-// Connection handling
-async function handleConnect() {
-    try {
-        device = await navigator.bluetooth.requestDevice({
-            acceptAllDevices: true,
-            optionalServices: ['0000fff0-0000-1000-8000-00805f9b34fb']
+async function hc(){
+    try{
+        if(d&&d.gatt.connected)return;
+        d=await navigator.bluetooth.requestDevice({
+            acceptAllDevices:true,
+            optionalServices:['0000fff0-0000-1000-8000-00805f9b34fb']
         });
-        
-        device.addEventListener('gattserverdisconnected', () => {
-            document.getElementById('connectBtn').style.display = 'block';
-            document.getElementById('controls').style.display = 'none';
+        d.addEventListener('gattserverdisconnected',()=>{
+            document.getElementById('connectBtn').style.display='block';
+            document.getElementById('controls').style.display='none';
         });
-        
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
-        characteristic = await service.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
-        
-        document.getElementById('connectBtn').style.display = 'none';
-        document.getElementById('controls').style.display = 'block';
-    } catch (error) {
-        document.getElementById('status').textContent = `Error: ${error.message}`;
-    }
+        const s=await d.gatt.connect(),v=await s.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
+        c=await v.getCharacteristic('0000fff3-0000-1000-8000-00805f9b34fb');
+        document.getElementById('connectBtn').style.display='none';
+        document.getElementById('controls').style.display='block';
+    }catch(e){document.getElementById('status').textContent=`Error: ${e}`;}
 }
 
-// Color calculations
-function calculateTriangleColor(x, y) {
-    const width = 400;
-    const height = 346;
-    
-    // Convert to barycentric coordinates
-    const v = (y / height) * 2;
-    const u = (x / width) * (1 - (y / height));
-    
-    const red = Math.min(255, (1 - u - v/2) * 255);
-    const green = Math.min(255, u * 255);
-    const blue = Math.min(255, (v/2) * 255);
-    
-    return {
-        r: Math.round(red),
-        g: Math.round(green),
-        b: Math.round(blue)
-    };
+function sc(cmd){return c?c.writeValue(cmd):Promise.reject();}
+function setC(r,g,b){clr={r,g,b};return sc(new Uint8Array([0x7e,0,5,3,r,g,b,0,0xef]));}
+function setB(v){return sc(new Uint8Array([0x7e,0,1,v,0,0,0,0,0xef]));}
+
+function hoverPower(){
+    if(pwr)sc(new Uint8Array([0x7e,0,4,0,0,0,0,0xef]));
+}
+function unhoverPower(){
+    if(pwr)sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef])).then(()=>setC(clr.r,clr.g,clr.b));
+}
+function togglePower(){
+    pwr=!pwr;
+    const p=document.getElementById('powerBtn');
+    p.textContent=pwr?'Power Off':'Power On';
+    p.classList.toggle('on');
+    sc(new Uint8Array([0x7e,0,4,pwr?1:0,0,0,0,0xef])).then(()=>pwr&&setC(clr.r,clr.g,clr.b));
 }
 
-function handleColorHover(event) {
-    if (!previewEnabled || colorSelectCooldown) return;
-    
-    const rect = event.target.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const color = calculateTriangleColor(x, y);
-    
-    if (isPoweredOn) sendColorCommand(color);
-}
-
-function selectColor(event) {
-    const rect = event.target.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    currentColor = calculateTriangleColor(x, y);
-    sendColorCommand(currentColor);
-    
-    // Start 5-second cooldown
-    colorSelectCooldown = true;
-    setTimeout(() => {
-        colorSelectCooldown = false;
-    }, 5000);
-}
-
-// Preview toggle
-function togglePreview() {
-    previewEnabled = !previewEnabled;
-    const btn = document.getElementById('previewToggle');
-    btn.textContent = `Preview: ${previewEnabled ? 'ON' : 'OFF'}`;
-    btn.classList.toggle('on');
-}
-
-// Device commands
-function sendColorCommand(color) {
-    if (!characteristic) return;
-    const command = new Uint8Array([0x7e, 0x00, 0x05, 0x03, 
-                                  color.r, color.g, color.b, 0x00, 0xef]);
-    characteristic.writeValue(command);
-}
-
-function handleBrightnessChange(event) {
-    if (!characteristic || !isPoweredOn) return;
-    const value = parseInt(event.target.value);
-    const command = new Uint8Array([0x7e, 0x00, 0x01, value, 
-                                  0x00, 0x00, 0x00, 0x00, 0xef]);
-    characteristic.writeValue(command);
-}
-
-// Power management
-function handlePowerHover(hovering) {
-    isHoveringPower = hovering;
-    if (!characteristic) return;
-    
-    const command = new Uint8Array([0x7e, 0x00, 0x04, 
-                                   hovering ? 0x00 : (isPoweredOn ? 0x01 : 0x00), 
-                                   0x00, 0x00, 0x00, 0xef]);
-    characteristic.writeValue(command);
-}
-
-function togglePower() {
-    isPoweredOn = !isPoweredOn;
-    const powerBtn = document.getElementById('powerBtn');
-    powerBtn.textContent = isPoweredOn ? 'Power Off' : 'Power On';
-    powerBtn.classList.toggle('on');
-    
-    if (isPoweredOn) {
-        sendColorCommand(currentColor);
-    } else {
-        const command = new Uint8Array([0x7e, 0x00, 0x04, 0x00, 
-                                      0x00, 0x00, 0x00, 0xef]);
-        characteristic.writeValue(command);
-    }
+function setTriangleColor(e){
+    const t=e.target.getBoundingClientRect(),x=e.clientX-t.left,y=e.clientY-t.top;
+    const r=Math.min(255,510-(x/y)*510),b=Math.min(255,510-((200-x)/y)*510);
+    setC(r,255-r-b,b);
 }
 </script>
 </body>
