@@ -6,16 +6,18 @@
     <style>
         body{background:#0a192f;color:#e6f1ff;font-family:sans-serif;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;margin:0;}
         #color-rect{width:600px;height:300px;background:linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,1)), linear-gradient(to right,red,yellow,lime,cyan,blue,magenta,red);cursor:crosshair;margin:20px 0;position:relative;}
-        .preset{width:90px;height:40px;margin:5px;cursor:pointer;border:2px solid #444;border-radius:6px;display:inline-block;}
+        .preset-row{display:flex;justify-content:center;width:100%;margin-bottom:10px;}
+        .preset{width:180px;height:50px;margin:5px;cursor:pointer;border:2px solid #444;border-radius:6px;display:flex;align-items:center;position:relative;}
         .preset.editing{border:2px solid orange;}
-        button{padding:12px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:5px;transition:all 0.3s;}
+        .edit-icon{width:20px;height:20px;margin-left:5px;cursor:pointer;opacity:0.5;transition:all 0.2s;}
+        .edit-icon:hover{opacity:1;}
+        .button-group{display:flex;justify-content:center;gap:10px;margin-bottom:20px;}
+        button{padding:12px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:0;transition:all 0.3s;}
         #connectBtn{background:#3b82f6;color:white;}
-        #powerBtn,#previewBtn{min-width:120px;}
-        #powerBtn{background:#444;color:white;transition:all 0.2s ease;}
+        #powerBtn,#previewBtn{min-width:120px;background:#444;color:white;}
         #powerBtn.on,#previewBtn.on{background:#3b82f6;box-shadow:0 0 15px #3b82f6;}
-        #powerBtn:hover{transform:scale(1.05);box-shadow:0 0 10px rgba(59,130,246,0.5);}
-        #powerBtn.hover-effect{background:#3b82f6;box-shadow:0 0 15px #3b82f6;}
-        #presets{display:flex;flex-wrap:wrap;justify-content:center;max-width:600px;margin-bottom:20px;}
+        #powerBtn:hover,#previewBtn:hover{transform:scale(1.05);box-shadow:0 0 10px rgba(59,130,246,0.5);}
+        #powerBtn.hover-effect,#previewBtn.hover-effect{background:#3b82f6;box-shadow:0 0 15px #3b82f6;}
     </style>
 </head>
 <body>
@@ -24,29 +26,45 @@
         <h1>BLEDOM Controller</h1>
         <button id="connectBtn" onclick="hc()">Connect</button>
         <div id="controls" style="display:none">
-            <button id="powerBtn" onmouseover="hoverPower()" onmouseout="unhoverPower()" onclick="lockPower()">Power Off</button><br>
-            <div id="color-rect" onmousemove="throttlePreview(event)" onclick="lockColor(event)"></div>
-            <div id="presets">
-                <div class="preset" id="preset1" onclick="handlePresetClick(1)" ondblclick="editPreset(1)"></div>
-                <div class="preset" id="preset2" onclick="handlePresetClick(2)" ondblclick="editPreset(2)"></div>
-                <div class="preset" id="preset3" onclick="handlePresetClick(3)" ondblclick="editPreset(3)"></div>
-                <div class="preset" id="preset4" onclick="handlePresetClick(4)" ondblclick="editPreset(4)"></div>
-                <div class="preset" id="preset5" onclick="handlePresetClick(5)" ondblclick="editPreset(5)"></div>
-                <div class="preset" id="preset6" onclick="handlePresetClick(6)" ondblclick="editPreset(6)"></div>
+            <div class="button-group">
+                <button id="powerBtn" onmouseover="hoverPower()" onmouseout="unhoverPower()" onclick="lockPower()">Power Off</button>
+                <button id="previewBtn" class="on" onclick="togglePreview()">Preview: ON</button>
             </div>
-            <button id="previewBtn" class="on" onclick="togglePreview()">Preview: ON</button>
+            <div id="color-rect" onmousemove="throttlePreview(event)" onclick="lockColor(event)"></div>
+            <div class="preset-row">
+                <div class="preset" id="preset1" onclick="handlePresetClick(1)">
+                    <div class="edit-icon" onclick="editPreset(1, event)">✏️</div>
+                </div>
+                <div class="preset" id="preset2" onclick="handlePresetClick(2)">
+                    <div class="edit-icon" onclick="editPreset(2, event)">✏️</div>
+                </div>
+                <div class="preset" id="preset3" onclick="handlePresetClick(3)">
+                    <div class="edit-icon" onclick="editPreset(3, event)">✏️</div>
+                </div>
+            </div>
+            <div class="preset-row">
+                <div class="preset" id="preset4" onclick="handlePresetClick(4)">
+                    <div class="edit-icon" onclick="editPreset(4, event)">✏️</div>
+                </div>
+                <div class="preset" id="preset5" onclick="handlePresetClick(5)">
+                    <div class="edit-icon" onclick="editPreset(5, event)">✏️</div>
+                </div>
+                <div class="preset" id="preset6" onclick="handlePresetClick(6)">
+                    <div class="edit-icon" onclick="editPreset(6, event)">✏️</div>
+                </div>
+            </div>
         </div>
     </div>
 
 <script>
 let d,c,clr={r:255,g:0,b:0},pwr=1,preview=1,cooldown=0,isConnected=0,lastColorTime=0;
 let presets = JSON.parse(localStorage.getItem('bledomPresets')) || [
-    {r:255,g:60,b:0,brightness:50},
-    {r:0,g:255,b:255,brightness:50},
-    {r:255,g:0,b:255,brightness:50},
-    {r:255,g:255,b:0,brightness:50},
-    {r:0,g:255,b:0,brightness:50},
-    {r:255,g:0,b:0,brightness:50}
+    {r:0,g:0,b:0,brightness:50},
+    {r:0,g:0,b:0,brightness:50},
+    {r:0,g:0,b:0,brightness:50},
+    {r:0,g:0,b:0,brightness:50},
+    {r:0,g:0,b:0,brightness:50},
+    {r:0,g:0,b:0,brightness:50}
 ];
 let editingPreset = null;
 
@@ -86,7 +104,7 @@ async function hc(){
 
 function throttlePreview(e){
     const now=Date.now();
-    if(!preview||cooldown||!pwr||now-lastColorTime<5)return;
+    if(!preview||cooldown||!pwr||now-lastColorTime<100)return;
     lastColorTime=now;
     const rect=e.target.getBoundingClientRect();
     const x=(e.clientX-rect.left)/rect.width;
@@ -121,12 +139,16 @@ function handlePresetClick(num) {
     applyPreset(num-1);
 }
 
-function editPreset(num) {
+function editPreset(num, e) {
+    e.stopPropagation();
     if(editingPreset) {
         document.getElementById(`preset${editingPreset}`).classList.remove('editing');
     }
     editingPreset = num;
     document.getElementById(`preset${num}`).classList.add('editing');
+    // Save current color as the preset if we're not already editing
+    presets[num-1] = {...clr, brightness: document.getElementById('brightness').value};
+    updatePresetDisplays();
 }
 
 function applyPreset(index) {
