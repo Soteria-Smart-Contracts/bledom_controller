@@ -7,14 +7,14 @@
         body{background:#0a192f;color:#e6f1ff;font-family:sans-serif;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;margin:0;}
         #color-rect{width:600px;height:300px;background:linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,1)), linear-gradient(to right,red,yellow,lime,cyan,blue,magenta,red);cursor:crosshair;margin:20px 0;position:relative;}
         .preset-row{display:flex;justify-content:center;width:100%;margin-bottom:10px;}
-        .preset{width:180px;height:50px;margin:5px;cursor:pointer;border:2px solid #444;border-radius:6px;display:flex;align-items:center;position:relative;}
+        .preset{width:180px;height:50px;margin:5px;cursor:pointer;border:2px solid #444;border-radius:6px;position:relative;}
         .preset.editing{border:2px solid orange;}
-        .edit-icon{width:20px;height:20px;margin-left:5px;cursor:pointer;opacity:0.5;transition:all 0.2s;}
-        .edit-icon:hover{opacity:1;}
-        .button-group{display:flex;justify-content:center;gap:10px;margin-bottom:20px;}
-        button{padding:12px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:0;transition:all 0.3s;}
+        .edit-icon{position:absolute;left:5px;top:5px;width:20px;height:20px;background:#444;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;cursor:pointer;z-index:2;}
+        .edit-icon:hover{background:#3b82f6;}
+        button{padding:12px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:5px;transition:all 0.3s;}
         #connectBtn{background:#3b82f6;color:white;}
-        #powerBtn,#previewBtn{min-width:120px;background:#444;color:white;}
+        .control-group{display:flex;justify-content:center;align-items:center;gap:10px;}
+        #powerBtn,#previewBtn{min-width:120px;background:#444;color:white;transition:all 0.3s ease;}
         #powerBtn.on,#previewBtn.on{background:#3b82f6;box-shadow:0 0 15px #3b82f6;}
         #powerBtn:hover,#previewBtn:hover{transform:scale(1.05);box-shadow:0 0 10px rgba(59,130,246,0.5);}
         #powerBtn.hover-effect,#previewBtn.hover-effect{background:#3b82f6;box-shadow:0 0 15px #3b82f6;}
@@ -26,31 +26,37 @@
         <h1>BLEDOM Controller</h1>
         <button id="connectBtn" onclick="hc()">Connect</button>
         <div id="controls" style="display:none">
-            <div class="button-group">
+            <div class="control-group">
                 <button id="powerBtn" onmouseover="hoverPower()" onmouseout="unhoverPower()" onclick="lockPower()">Power Off</button>
                 <button id="previewBtn" class="on" onclick="togglePreview()">Preview: ON</button>
             </div>
             <div id="color-rect" onmousemove="throttlePreview(event)" onclick="lockColor(event)"></div>
             <div class="preset-row">
-                <div class="preset" id="preset1" onclick="handlePresetClick(1)">
-                    <div class="edit-icon" onclick="editPreset(1, event)">✏️</div>
+                <div class="preset" id="preset1">
+                    <div class="edit-icon" onclick="toggleEditPreset(1)">✎</div>
+                    <div class="preset-content" onclick="handlePresetClick(1)"></div>
                 </div>
-                <div class="preset" id="preset2" onclick="handlePresetClick(2)">
-                    <div class="edit-icon" onclick="editPreset(2, event)">✏️</div>
+                <div class="preset" id="preset2">
+                    <div class="edit-icon" onclick="toggleEditPreset(2)">✎</div>
+                    <div class="preset-content" onclick="handlePresetClick(2)"></div>
                 </div>
-                <div class="preset" id="preset3" onclick="handlePresetClick(3)">
-                    <div class="edit-icon" onclick="editPreset(3, event)">✏️</div>
+                <div class="preset" id="preset3">
+                    <div class="edit-icon" onclick="toggleEditPreset(3)">✎</div>
+                    <div class="preset-content" onclick="handlePresetClick(3)"></div>
                 </div>
             </div>
             <div class="preset-row">
-                <div class="preset" id="preset4" onclick="handlePresetClick(4)">
-                    <div class="edit-icon" onclick="editPreset(4, event)">✏️</div>
+                <div class="preset" id="preset4">
+                    <div class="edit-icon" onclick="toggleEditPreset(4)">✎</div>
+                    <div class="preset-content" onclick="handlePresetClick(4)"></div>
                 </div>
-                <div class="preset" id="preset5" onclick="handlePresetClick(5)">
-                    <div class="edit-icon" onclick="editPreset(5, event)">✏️</div>
+                <div class="preset" id="preset5">
+                    <div class="edit-icon" onclick="toggleEditPreset(5)">✎</div>
+                    <div class="preset-content" onclick="handlePresetClick(5)"></div>
                 </div>
-                <div class="preset" id="preset6" onclick="handlePresetClick(6)">
-                    <div class="edit-icon" onclick="editPreset(6, event)">✏️</div>
+                <div class="preset" id="preset6">
+                    <div class="edit-icon" onclick="toggleEditPreset(6)">✎</div>
+                    <div class="preset-content" onclick="handlePresetClick(6)"></div>
                 </div>
             </div>
         </div>
@@ -98,7 +104,11 @@ async function hc(){
         document.getElementById('connectBtn').style.display='none';
         document.getElementById('controls').style.display='block';
         isConnected=1;
-        applyPreset(0);
+        // Auto-on with current color when interacting
+        pwr = 1;
+        document.getElementById('powerBtn').textContent='Power Off';
+        document.getElementById('powerBtn').classList.add('on');
+        await sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef]));
     }catch(e){console.error('Connection error:',e);alert('Connection error: '+e.message);}
 }
 
@@ -113,6 +123,12 @@ function throttlePreview(e){
     const rgb=hsvToRgb(x*360,1,1);
     setC(rgb.r,rgb.g,rgb.b);
     setB(brightness);
+    
+    // If in edit mode, update the preset preview
+    if(editingPreset) {
+        presets[editingPreset-1] = {r:rgb.r, g:rgb.g, b:rgb.b, brightness};
+        updatePresetDisplays();
+    }
 }
 
 function lockColor(e){
@@ -123,9 +139,9 @@ function lockColor(e){
     const rgb=hsvToRgb(x*360,1,1);
     setC(rgb.r,rgb.g,rgb.b);
     setB(brightness);
+    
     if(editingPreset) {
         presets[editingPreset-1] = {r:rgb.r, g:rgb.g, b:rgb.b, brightness};
-        updatePresetDisplays();
         document.getElementById(`preset${editingPreset}`).classList.remove('editing');
         editingPreset = null;
         savePresets();
@@ -139,31 +155,39 @@ function handlePresetClick(num) {
     applyPreset(num-1);
 }
 
-function editPreset(num, e) {
-    e.stopPropagation();
-    if(editingPreset) {
-        document.getElementById(`preset${editingPreset}`).classList.remove('editing');
+function toggleEditPreset(num) {
+    if(editingPreset === num) {
+        document.getElementById(`preset${num}`).classList.remove('editing');
+        editingPreset = null;
+    } else {
+        if(editingPreset) {
+            document.getElementById(`preset${editingPreset}`).classList.remove('editing');
+        }
+        editingPreset = num;
+        document.getElementById(`preset${num}`).classList.add('editing');
+        // Set current color to the preset being edited
+        const preset = presets[num-1];
+        setC(preset.r, preset.g, preset.b);
+        setB(preset.brightness);
     }
-    editingPreset = num;
-    document.getElementById(`preset${num}`).classList.add('editing');
-    // Save current color as the preset if we're not already editing
-    presets[num-1] = {...clr, brightness: document.getElementById('brightness').value};
-    updatePresetDisplays();
 }
 
 function applyPreset(index) {
     const preset = presets[index];
-    setC(preset.r, preset.g, preset.b);
-    setB(preset.brightness);
-    clr = {r: preset.r, g: preset.g, b: preset.b};
+    // Auto turn on lights when applying preset
     pwr = 1;
     document.getElementById('powerBtn').textContent='Power Off';
     document.getElementById('powerBtn').classList.add('on');
+    sc(new Uint8Array([0x7e,0,4,1,0,0,0,0xef])).then(()=>{
+        setC(preset.r, preset.g, preset.b);
+        setB(preset.brightness);
+        clr = {r: preset.r, g: preset.g, b: preset.b};
+    });
 }
 
 function updatePresetDisplays() {
     presets.forEach((preset, i) => {
-        const el = document.getElementById(`preset${i+1}`);
+        const el = document.getElementById(`preset${i+1}`).querySelector('.preset-content');
         el.style.background = `rgb(${preset.r},${preset.g},${preset.b})`;
         el.title = `Color: ${Math.round(preset.r)},${Math.round(preset.g)},${Math.round(preset.b)} | Brightness: ${preset.brightness}%`;
     });
