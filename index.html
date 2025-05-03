@@ -5,10 +5,13 @@
     <title>BLEDOM Controller</title>
     <style>
         body{background:#0a192f;color:#e6f1ff;font-family:sans-serif;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;margin:0;}
-        #color-rect{width:600px;height:300px;background:linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,1)), linear-gradient(to right,red,yellow,lime,cyan,blue,magenta,red);cursor:crosshair;margin:20px 0;position:relative;border-radius:8px;}
+        #color-container{display:flex;width:600px;height:300px;margin:20px 0;}
+        #color-picker{width:75%;height:100%;background:linear-gradient(to right,red,yellow,lime,cyan,blue,magenta,red);cursor:crosshair;position:relative;border-radius:8px 0 0 8px;}
+        #brightness-picker{width:25%;height:100%;background:linear-gradient(to bottom, white, black);cursor:crosshair;border-radius:0 8px 8px 0;}
         .preset-row{display:flex;justify-content:center;width:100%;margin-bottom:10px;}
-        .preset-container{position:relative;width:180px;height:50px;margin:5px;}
-        .preset{width:100%;height:100%;cursor:pointer;border:2px solid #444;border-radius:6px;}
+        .preset-container{position:relative;width:180px;height:50px;margin:5px;display:flex;}
+        .preset-color{width:75%;height:100%;cursor:pointer;border:2px solid #444;border-radius:6px 0 0 6px;}
+        .preset-brightness{width:25%;height:100%;cursor:pointer;border:2px solid #444;border-left:none;border-radius:0 6px 6px 0;background:linear-gradient(to bottom, white, black);}
         .edit-icon{position:absolute;right:5px;top:5px;background:#3b82f6;color:white;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;opacity:0;transition:opacity 0.2s;}
         .preset-container:hover .edit-icon{opacity:1;}
         button{padding:12px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:5px;transition:all 0.3s;}
@@ -72,7 +75,7 @@
             opacity: 0;
             transition: opacity 0.2s;
         }
-        #color-rect:hover .color-display {
+        #color-picker:hover .color-display {
             opacity: 1;
         }
     </style>
@@ -87,34 +90,43 @@
                 <button id="powerBtn" class="control-btn" onmouseover="hoverPower()" onmouseout="unhoverPower()" onclick="lockPower()">Power Off</button>
                 <button id="previewBtn" class="control-btn on" onclick="togglePreview()">Preview: ON</button>
             </div>
-            <div id="color-rect" onmousemove="throttlePreview(event)" onclick="lockColor(event)">
-                <div class="color-display" id="colorDisplay">R: 0 G: 0 B: 0</div>
+            <div id="color-container">
+                <div id="color-picker" onmousemove="throttleColor(event)" onclick="lockColor(event)">
+                    <div class="color-display" id="colorDisplay">R: 0 G: 0 B: 0</div>
+                </div>
+                <div id="brightness-picker" onmousemove="throttleBrightness(event)" onclick="lockBrightness(event)"></div>
             </div>
             <div class="preset-row">
                 <div class="preset-container">
-                    <div class="preset" id="preset1" onclick="applyPreset(0)"></div>
+                    <div class="preset-color" id="preset1-color" onclick="applyPreset(0)"></div>
+                    <div class="preset-brightness" id="preset1-brightness" onclick="applyPreset(0)"></div>
                     <div class="edit-icon" onclick="startEditingPreset(0)">✎</div>
                 </div>
                 <div class="preset-container">
-                    <div class="preset" id="preset2" onclick="applyPreset(1)"></div>
+                    <div class="preset-color" id="preset2-color" onclick="applyPreset(1)"></div>
+                    <div class="preset-brightness" id="preset2-brightness" onclick="applyPreset(1)"></div>
                     <div class="edit-icon" onclick="startEditingPreset(1)">✎</div>
                 </div>
                 <div class="preset-container">
-                    <div class="preset" id="preset3" onclick="applyPreset(2)"></div>
+                    <div class="preset-color" id="preset3-color" onclick="applyPreset(2)"></div>
+                    <div class="preset-brightness" id="preset3-brightness" onclick="applyPreset(2)"></div>
                     <div class="edit-icon" onclick="startEditingPreset(2)">✎</div>
                 </div>
             </div>
             <div class="preset-row">
                 <div class="preset-container">
-                    <div class="preset" id="preset4" onclick="applyPreset(3)"></div>
+                    <div class="preset-color" id="preset4-color" onclick="applyPreset(3)"></div>
+                    <div class="preset-brightness" id="preset4-brightness" onclick="applyPreset(3)"></div>
                     <div class="edit-icon" onclick="startEditingPreset(3)">✎</div>
                 </div>
                 <div class="preset-container">
-                    <div class="preset" id="preset5" onclick="applyPreset(4)"></div>
+                    <div class="preset-color" id="preset5-color" onclick="applyPreset(4)"></div>
+                    <div class="preset-brightness" id="preset5-brightness" onclick="applyPreset(4)"></div>
                     <div class="edit-icon" onclick="startEditingPreset(4)">✎</div>
                 </div>
                 <div class="preset-container">
-                    <div class="preset" id="preset6" onclick="applyPreset(5)"></div>
+                    <div class="preset-color" id="preset6-color" onclick="applyPreset(5)"></div>
+                    <div class="preset-brightness" id="preset6-brightness" onclick="applyPreset(5)"></div>
                     <div class="edit-icon" onclick="startEditingPreset(5)">✎</div>
                 </div>
             </div>
@@ -183,21 +195,7 @@ async function hc(){
         document.getElementById('powerBtn').classList.add('on');
         document.getElementById('brightness').value = 18;
         document.getElementById('brightness-value').textContent = '18%';
-        
-        // Update color rectangle gradient
-        updateColorRectGradient();
     }catch(e){console.error('Connection error:',e);alert('Connection error: '+e.message);}
-}
-
-function updateColorRectGradient() {
-    const rect = document.getElementById('color-rect');
-    rect.style.background = `
-        linear-gradient(to bottom, 
-            rgba(0,0,0,0), 
-            rgba(0,0,0,0.5)),
-        linear-gradient(to right,
-            red,yellow,lime,cyan,blue,magenta,red)
-    `;
 }
 
 function updateBrightness(value) {
@@ -206,27 +204,26 @@ function updateBrightness(value) {
     if(editingPreset !== null) {
         presets[editingPreset].brightness = parseInt(value);
         savePresets();
+        updatePresetDisplays();
     }
 }
 
 function startEditingPreset(index) {
     editingPreset = index;
     // Highlight the current preset being edited
-    document.querySelectorAll('.preset').forEach(p => p.style.borderColor = '#444');
-    document.getElementById(`preset${index+1}`).style.borderColor = 'orange';
+    document.querySelectorAll('.preset-color').forEach(p => p.style.borderColor = '#444');
+    document.getElementById(`preset${index+1}-color`).style.borderColor = 'orange';
     // Update slider to match preset brightness
     document.getElementById('brightness').value = presets[index].brightness;
     document.getElementById('brightness-value').textContent = `${presets[index].brightness}%`;
 }
 
-function throttlePreview(e){
+function throttleColor(e){
     const now=Date.now();
     if(!preview||cooldown||!pwr||now-lastColorTime<100)return;
     lastColorTime=now;
     const rect=e.target.getBoundingClientRect();
     const x=(e.clientX-rect.left)/rect.width;
-    const y=(e.clientY-rect.top)/rect.height;
-    const brightness = Math.round(100 - (y * 100));
     const rgb=hsvToRgb(x*360,1,1);
     
     // Update hover display
@@ -234,6 +231,14 @@ function throttlePreview(e){
     document.getElementById('colorDisplay').textContent = `R: ${Math.round(rgb.r)} G: ${Math.round(rgb.g)} B: ${Math.round(rgb.b)}`;
     
     setC(rgb.r,rgb.g,rgb.b);
+}
+
+function throttleBrightness(e){
+    const now=Date.now();
+    if(!preview||cooldown||!pwr||now-lastColorTime<100)return;
+    lastColorTime=now;
+    const rect=e.target.getBoundingClientRect();
+    const brightness = Math.round(100 - ((e.clientY-rect.top)/rect.height * 100));
     setB(brightness);
     document.getElementById('brightness').value = brightness;
     document.getElementById('brightness-value').textContent = `${brightness}%`;
@@ -242,19 +247,32 @@ function throttlePreview(e){
 function lockColor(e){
     const rect=e.target.getBoundingClientRect();
     const x=(e.clientX-rect.left)/rect.width;
-    const y=(e.clientY-rect.top)/rect.height;
-    const brightness = Math.round(100 - (y * 100));
     const rgb=hsvToRgb(x*360,1,1);
     setC(rgb.r,rgb.g,rgb.b);
+    
+    if(editingPreset !== null) {
+        presets[editingPreset].r = rgb.r;
+        presets[editingPreset].g = rgb.g;
+        presets[editingPreset].b = rgb.b;
+        updatePresetDisplays();
+        document.getElementById(`preset${editingPreset+1}-color`).style.borderColor = '#444';
+        savePresets();
+    }
+    
+    cooldown=1;
+    setTimeout(()=>cooldown=0,5000);
+}
+
+function lockBrightness(e){
+    const rect=e.target.getBoundingClientRect();
+    const brightness = Math.round(100 - ((e.clientY-rect.top)/rect.height * 100));
     setB(brightness);
     document.getElementById('brightness').value = brightness;
     document.getElementById('brightness-value').textContent = `${brightness}%`;
     
     if(editingPreset !== null) {
-        presets[editingPreset] = {r:rgb.r, g:rgb.g, b:rgb.b, brightness};
+        presets[editingPreset].brightness = brightness;
         updatePresetDisplays();
-        document.getElementById(`preset${editingPreset+1}`).style.borderColor = '#444';
-        editingPreset = null;
         savePresets();
     }
     
@@ -277,9 +295,14 @@ function applyPreset(index) {
 
 function updatePresetDisplays() {
     presets.forEach((preset, i) => {
-        const el = document.getElementById(`preset${i+1}`);
-        el.style.background = `rgb(${preset.r},${preset.g},${preset.b})`;
-        el.title = `Color: ${Math.round(preset.r)},${Math.round(preset.g)},${Math.round(preset.b)} | Brightness: ${preset.brightness}%`;
+        const colorEl = document.getElementById(`preset${i+1}-color`);
+        const brightnessEl = document.getElementById(`preset${i+1}-brightness`);
+        
+        colorEl.style.background = `rgb(${preset.r},${preset.g},${preset.b})`;
+        brightnessEl.style.opacity = preset.brightness/100;
+        
+        colorEl.title = `Color: ${Math.round(preset.r)},${Math.round(preset.g)},${Math.round(preset.b)}`;
+        brightnessEl.title = `Brightness: ${preset.brightness}%`;
     });
 }
 
