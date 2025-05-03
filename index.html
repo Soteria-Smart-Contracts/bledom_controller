@@ -7,7 +7,10 @@
         body{background:#0a192f;color:#e6f1ff;font-family:sans-serif;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;margin:0;}
         #color-rect{width:600px;height:300px;background:linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,1)), linear-gradient(to right,red,yellow,lime,cyan,blue,magenta,red);cursor:crosshair;margin:20px 0;position:relative;}
         .preset-row{display:flex;justify-content:center;width:100%;margin-bottom:10px;}
-        .preset{width:180px;height:50px;margin:5px;cursor:pointer;border:2px solid #444;border-radius:6px;}
+        .preset-container{position:relative;width:180px;height:50px;margin:5px;}
+        .preset{width:100%;height:100%;cursor:pointer;border:2px solid #444;border-radius:6px;}
+        .edit-icon{position:absolute;right:5px;top:5px;background:#3b82f6;color:white;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;opacity:0;transition:opacity 0.2s;}
+        .preset-container:hover .edit-icon{opacity:1;}
         button{padding:12px 24px;font-size:16px;border:none;border-radius:6px;cursor:pointer;margin:5px;transition:all 0.3s;}
         #connectBtn{background:#3b82f6;color:white;}
         .control-btn{min-width:120px;background:#444;color:white;transition:all 0.2s ease;}
@@ -15,6 +18,44 @@
         .control-btn:hover{transform:scale(1.05);box-shadow:0 0 10px rgba(59,130,246,0.5);}
         .control-btn.hover-effect{background:#3b82f6;box-shadow:0 0 15px #3b82f6;}
         .btn-group{display:flex;justify-content:center;}
+        
+        /* Fancy Brightness Slider */
+        .brightness-container {width: 600px; margin: 20px 0;}
+        .brightness-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(to right, #000, #fff);
+            outline: none;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        .brightness-slider:hover {opacity: 1;}
+        .brightness-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+        .brightness-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+        .brightness-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -29,14 +70,39 @@
             </div>
             <div id="color-rect" onmousemove="throttlePreview(event)" onclick="lockColor(event)"></div>
             <div class="preset-row">
-                <div class="preset" id="preset1" onclick="applyPreset(0)"></div>
-                <div class="preset" id="preset2" onclick="applyPreset(1)"></div>
-                <div class="preset" id="preset3" onclick="applyPreset(2)"></div>
+                <div class="preset-container">
+                    <div class="preset" id="preset1" onclick="applyPreset(0)"></div>
+                    <div class="edit-icon" onclick="startEditingPreset(0)">✎</div>
+                </div>
+                <div class="preset-container">
+                    <div class="preset" id="preset2" onclick="applyPreset(1)"></div>
+                    <div class="edit-icon" onclick="startEditingPreset(1)">✎</div>
+                </div>
+                <div class="preset-container">
+                    <div class="preset" id="preset3" onclick="applyPreset(2)"></div>
+                    <div class="edit-icon" onclick="startEditingPreset(2)">✎</div>
+                </div>
             </div>
             <div class="preset-row">
-                <div class="preset" id="preset4" onclick="applyPreset(3)"></div>
-                <div class="preset" id="preset5" onclick="applyPreset(4)"></div>
-                <div class="preset" id="preset6" onclick="applyPreset(5)"></div>
+                <div class="preset-container">
+                    <div class="preset" id="preset4" onclick="applyPreset(3)"></div>
+                    <div class="edit-icon" onclick="startEditingPreset(3)">✎</div>
+                </div>
+                <div class="preset-container">
+                    <div class="preset" id="preset5" onclick="applyPreset(4)"></div>
+                    <div class="edit-icon" onclick="startEditingPreset(4)">✎</div>
+                </div>
+                <div class="preset-container">
+                    <div class="preset" id="preset6" onclick="applyPreset(5)"></div>
+                    <div class="edit-icon" onclick="startEditingPreset(5)">✎</div>
+                </div>
+            </div>
+            <div class="brightness-container">
+                <div class="brightness-label">
+                    <span>Brightness</span>
+                    <span id="brightness-value">50%</span>
+                </div>
+                <input type="range" min="0" max="100" value="50" class="brightness-slider" id="brightness" oninput="updateBrightness(this.value)">
             </div>
         </div>
     </div>
@@ -51,6 +117,7 @@ let presets = JSON.parse(localStorage.getItem('bledomPresets')) || [
     {r:0,g:255,b:0,brightness:50},
     {r:255,g:0,b:0,brightness:50}
 ];
+let editingPreset = null;
 
 const sc=cmd=>c?.writeValue(cmd)??Promise.reject();
 const setC=(r,g,b)=>{clr={r,g,b};return sc(new Uint8Array([0x7e,0,5,3,r,g,b,0,0xef]));};
@@ -92,7 +159,28 @@ async function hc(){
         // Update UI
         document.getElementById('powerBtn').textContent='Power Off';
         document.getElementById('powerBtn').classList.add('on');
+        document.getElementById('brightness').value = 18;
+        document.getElementById('brightness-value').textContent = '18%';
     }catch(e){console.error('Connection error:',e);alert('Connection error: '+e.message);}
+}
+
+function updateBrightness(value) {
+    setB(value);
+    document.getElementById('brightness-value').textContent = `${value}%`;
+    if(editingPreset !== null) {
+        presets[editingPreset].brightness = parseInt(value);
+        savePresets();
+    }
+}
+
+function startEditingPreset(index) {
+    editingPreset = index;
+    // Highlight the current preset being edited
+    document.querySelectorAll('.preset').forEach(p => p.style.borderColor = '#444');
+    document.getElementById(`preset${index+1}`).style.borderColor = 'orange';
+    // Update slider to match preset brightness
+    document.getElementById('brightness').value = presets[index].brightness;
+    document.getElementById('brightness-value').textContent = `${presets[index].brightness}%`;
 }
 
 function throttlePreview(e){
@@ -106,6 +194,8 @@ function throttlePreview(e){
     const rgb=hsvToRgb(x*360,1,1);
     setC(rgb.r,rgb.g,rgb.b);
     setB(brightness);
+    document.getElementById('brightness').value = brightness;
+    document.getElementById('brightness-value').textContent = `${brightness}%`;
 }
 
 function lockColor(e){
@@ -116,11 +206,23 @@ function lockColor(e){
     const rgb=hsvToRgb(x*360,1,1);
     setC(rgb.r,rgb.g,rgb.b);
     setB(brightness);
+    document.getElementById('brightness').value = brightness;
+    document.getElementById('brightness-value').textContent = `${brightness}%`;
+    
+    if(editingPreset !== null) {
+        presets[editingPreset] = {r:rgb.r, g:rgb.g, b:rgb.b, brightness};
+        updatePresetDisplays();
+        document.getElementById(`preset${editingPreset+1}`).style.borderColor = '#444';
+        editingPreset = null;
+        savePresets();
+    }
+    
     cooldown=1;
     setTimeout(()=>cooldown=0,5000);
 }
 
 function applyPreset(index) {
+    if(editingPreset !== null) return; // Don't apply if we're in edit mode
     const preset = presets[index];
     setC(preset.r, preset.g, preset.b);
     setB(preset.brightness);
@@ -128,6 +230,8 @@ function applyPreset(index) {
     pwr = 1;
     document.getElementById('powerBtn').textContent='Power Off';
     document.getElementById('powerBtn').classList.add('on');
+    document.getElementById('brightness').value = preset.brightness;
+    document.getElementById('brightness-value').textContent = `${preset.brightness}%`;
 }
 
 function updatePresetDisplays() {
